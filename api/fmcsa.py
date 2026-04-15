@@ -72,18 +72,23 @@ def _mock_carrier(mc_number: str) -> CarrierVerification:
     """
     Return a deterministic mock CarrierVerification based on the last digit of
     the MC number.  Odd last digit → eligible; even last digit → ineligible.
+    Always sets ``is_mock=True`` so callers can distinguish real vs mock data.
     """
     numeric_mc = mc_number.upper().lstrip("MC-").lstrip("MC").strip()
     # Fall back to "0" (ineligible) if the number contains no digits
     last_digit = next((c for c in reversed(numeric_mc) if c.isdigit()), "0")
     eligible = int(last_digit) % 2 != 0
+    logger.warning(
+        "FMCSA mock response generated for MC %s — is_eligible=%s", mc_number, eligible
+    )
     return CarrierVerification(
         mc_number=mc_number,
-        dot_number="12345",
-        legal_name="Test Carrier LLC" if eligible else "Test Carrier LLC (ineligible)",
+        dot_number="MOCK-001",
+        legal_name="FastFreight Carriers LLC" if eligible else "Suspended Transport Inc",
         operating_status="ACTIVE" if eligible else "INACTIVE",
         insurance_on_file=eligible,
         is_eligible=eligible,
+        is_mock=True,
     )
 
 
@@ -134,7 +139,8 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
         response = await client.get(url, params=params)
 
     if response.status_code == 404:
-        return None
+        logger.warning("FMCSA returned 404 for MC %s — falling back to mock mode", mc_number)
+        return _mock_carrier(mc_number)
 
     if response.status_code == 403:
         logger.warning(
@@ -148,6 +154,7 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
     data = response.json()
     content: Optional[dict] = data.get("content")
     if not content:
-        return None
+        logger.warning("FMCSA returned empty content for MC %s — falling back to mock mode", mc_number)
+        return _mock_carrier(mc_number)
 
     return _parse_carrier(mc_number, content)

@@ -108,6 +108,8 @@ class CarrierVerification(BaseModel):
     out_of_service_date: Optional[str] = None
     # Derived eligibility flag: active status + insurance on file
     is_eligible: bool = False
+    # True when the response was synthesised locally rather than returned by FMCSA
+    is_mock: bool = False
 
 
 # ---------------------------------------------------------------------------
