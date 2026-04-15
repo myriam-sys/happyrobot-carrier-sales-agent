@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +87,18 @@ class CallLogCreate(BaseModel):
     sentiment: CallSentiment
     call_duration_seconds: int = Field(..., ge=0, examples=[187])
     notes: Optional[str] = Field(None, examples=["Carrier requested Friday pickup"])
+
+    @field_validator("mc_number", mode="before")
+    @classmethod
+    def coerce_mc_number_to_str(cls, v):
+        return str(v)
+
+    @field_validator("initial_rate_offered", "final_agreed_rate", mode="before")
+    @classmethod
+    def coerce_empty_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return float(v) if isinstance(v, str) else v
 
 
 class CallLog(CallLogCreate):
