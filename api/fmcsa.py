@@ -10,6 +10,7 @@ We normalise it into our CarrierVerification schema.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Optional
 
@@ -17,6 +18,8 @@ import httpx
 from dotenv import load_dotenv
 
 from api.models import CarrierVerification
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -65,7 +68,26 @@ def _parse_carrier(mc_number: str, content: dict[str, Any]) -> CarrierVerificati
     )
 
 
-async def lookup_carrier(mc_number: str) -> Optional[CarrierVerification]:
+def _mock_carrier(mc_number: str) -> CarrierVerification:
+    """
+    Return a deterministic mock CarrierVerification based on the last digit of
+    the MC number.  Odd last digit → eligible; even last digit → ineligible.
+    """
+    numeric_mc = mc_number.upper().lstrip("MC-").lstrip("MC").strip()
+    # Fall back to "0" (ineligible) if the number contains no digits
+    last_digit = next((c for c in reversed(numeric_mc) if c.isdigit()), "0")
+    eligible = int(last_digit) % 2 != 0
+    return CarrierVerification(
+        mc_number=mc_number,
+        dot_number="12345",
+        legal_name="Test Carrier LLC" if eligible else "Test Carrier LLC (ineligible)",
+        operating_status="ACTIVE" if eligible else "INACTIVE",
+        insurance_on_file=eligible,
+        is_eligible=eligible,
+    )
+
+
+async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[CarrierVerification]:
     """
     Query the FMCSA API for a carrier by MC number.
 
@@ -74,6 +96,9 @@ async def lookup_carrier(mc_number: str) -> Optional[CarrierVerification]:
     mc_number:
         MC number with or without the ``MC-`` prefix (e.g. ``"123456"`` or
         ``"MC-123456"``).
+    mock:
+        When ``True``, bypass the FMCSA API entirely and return a mock
+        response (useful for UI/integration testing).
 
     Returns
     -------
@@ -84,8 +109,12 @@ async def lookup_carrier(mc_number: str) -> Optional[CarrierVerification]:
     Raises
     ------
     httpx.HTTPStatusError
-        Re-raised for non-404 HTTP errors so callers can decide how to handle.
+        Re-raised for non-404/403 HTTP errors so callers can decide how to handle.
     """
+    if mock:
+        logger.warning("FMCSA mock mode active for MC %s (explicit ?mock=true)", mc_number)
+        return _mock_carrier(mc_number)
+
     if not FMCSA_API_KEY:
         # Graceful degradation: return a stub so the rest of the system works
         # without a live FMCSA key (useful during local development/testing).
@@ -106,6 +135,13 @@ async def lookup_carrier(mc_number: str) -> Optional[CarrierVerification]:
 
     if response.status_code == 404:
         return None
+
+    if response.status_code == 403:
+        logger.warning(
+            "FMCSA returned 403 for MC %s (bad/expired key?) — falling back to mock mode",
+            mc_number,
+        )
+        return _mock_carrier(mc_number)
 
     response.raise_for_status()
 

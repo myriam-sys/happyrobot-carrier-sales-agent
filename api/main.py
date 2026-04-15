@@ -208,13 +208,16 @@ async def verify_carrier(mc_number: str):
 
 # Temporary debug endpoint to test FMCSA integration without auth - remove before production.
 @app.get("/debug/verify/{mc_number}", tags=["Debug"])
-async def debug_verify(mc_number: str):
+async def debug_verify(
+    mc_number: str,
+    mock: bool = Query(False, description="Force mock mode regardless of FMCSA key status"),
+):
     """Temporary debug endpoint - no auth - remove before production."""
     try:
-        result = await lookup_carrier(mc_number)
-        return {"success": True, "result": result}
+        result = await lookup_carrier(mc_number, mock=mock)
+        return {"success": True, "mock": mock, "result": result}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "mock": mock, "error": str(e)}
 
 
 @app.post(
