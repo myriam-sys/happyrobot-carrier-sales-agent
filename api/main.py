@@ -243,10 +243,14 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
     """
     raw = await request.json()
 
-    # Convert empty strings to None for optional fields
-    for field in ["load_id", "final_agreed_rate", "notes"]:
+    # Convert empty strings to None for optional fields (and mc_number if blank)
+    for field in ["load_id", "final_agreed_rate", "notes", "mc_number"]:
         if field in raw and raw[field] == "":
             raw[field] = None
+
+    # mc_number must always be a non-None string for logging purposes
+    if raw.get("mc_number") is None:
+        raw["mc_number"] = "UNKNOWN"
 
     # Convert numeric strings to proper types
     for field in ["initial_rate_offered", "final_agreed_rate"]:
