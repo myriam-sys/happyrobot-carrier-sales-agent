@@ -32,6 +32,7 @@ from api.models import (
     CarrierVerification,
     DashboardMetrics,
     Load,
+    LoadSearchResult,
     OutcomeBreakdown,
     SentimentBreakdown,
     TopLane,
@@ -122,7 +123,7 @@ def health_check():
 
 @app.get(
     "/loads",
-    response_model=list[Load],
+    response_model=LoadSearchResult,
     tags=["Loads"],
     summary="List freight loads",
     dependencies=[Depends(require_api_key)],
@@ -151,7 +152,8 @@ def list_loads(
     if equipment_type:
         q = q.filter(LoadORM.equipment_type == equipment_type)
 
-    return [_orm_to_load(row) for row in q.all()]
+    loads = [_orm_to_load(row) for row in q.all()]
+    return LoadSearchResult(loads=loads, count=len(loads), available=available_only)
 
 
 @app.get(

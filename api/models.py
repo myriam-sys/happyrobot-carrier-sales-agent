@@ -66,6 +66,12 @@ class Load(LoadBase):
     model_config = {"from_attributes": True}
 
 
+class LoadSearchResult(BaseModel):
+    loads: list[Load]
+    count: int
+    available: bool
+
+
 # ---------------------------------------------------------------------------
 # Call log schemas
 # ---------------------------------------------------------------------------
