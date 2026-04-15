@@ -12,7 +12,9 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timedelta
 
-from api.database import SessionLocal, create_tables, LoadORM
+import uuid
+
+from api.database import SessionLocal, create_tables, CallLogORM, LoadORM
 
 
 LOADS: list[dict] = [
@@ -214,6 +216,143 @@ LOADS: list[dict] = [
 ]
 
 
+SAMPLE_CALLS: list[dict] = [
+    # --- booked (6) ---
+    {
+        "mc_number": "MC-481923", "carrier_name": "Blue Ridge Logistics LLC",
+        "load_id": "LD-001", "initial_rate_offered": 2100.00, "final_agreed_rate": 2300.00,
+        "num_negotiation_rounds": 1, "outcome": "booked", "sentiment": "positive",
+        "call_duration_seconds": 203, "notes": "Carrier confirmed Friday pickup.",
+        "timestamp": datetime.utcnow() - timedelta(days=6, hours=3),
+    },
+    {
+        "mc_number": "MC-774521", "carrier_name": "Apex Freight Solutions",
+        "load_id": "LD-003", "initial_rate_offered": 2600.00, "final_agreed_rate": 2750.00,
+        "num_negotiation_rounds": 2, "outcome": "booked", "sentiment": "positive",
+        "call_duration_seconds": 318, "notes": "Slight rate bump to close.",
+        "timestamp": datetime.utcnow() - timedelta(days=5, hours=9),
+    },
+    {
+        "mc_number": "MC-209834", "carrier_name": "Summit Carriers Inc",
+        "load_id": "LD-005", "initial_rate_offered": 3100.00, "final_agreed_rate": 3100.00,
+        "num_negotiation_rounds": 0, "outcome": "booked", "sentiment": "positive",
+        "call_duration_seconds": 142, "notes": "First offer accepted immediately.",
+        "timestamp": datetime.utcnow() - timedelta(days=4, hours=11),
+    },
+    {
+        "mc_number": "MC-563017", "carrier_name": "Clearwater Transport Co",
+        "load_id": "LD-008", "initial_rate_offered": 2200.00, "final_agreed_rate": 2400.00,
+        "num_negotiation_rounds": 2, "outcome": "booked", "sentiment": "positive",
+        "call_duration_seconds": 275, "notes": None,
+        "timestamp": datetime.utcnow() - timedelta(days=3, hours=7),
+    },
+    {
+        "mc_number": "MC-348821", "carrier_name": "Iron Horse Hauling LLC",
+        "load_id": "LD-012", "initial_rate_offered": 3000.00, "final_agreed_rate": 3200.00,
+        "num_negotiation_rounds": 1, "outcome": "booked", "sentiment": "positive",
+        "call_duration_seconds": 198, "notes": "Carrier requested liftgate at delivery.",
+        "timestamp": datetime.utcnow() - timedelta(days=2, hours=5),
+    },
+    {
+        "mc_number": "MC-901456", "carrier_name": "Keystone Freight Partners",
+        "load_id": "LD-015", "initial_rate_offered": 3200.00, "final_agreed_rate": 3500.00,
+        "num_negotiation_rounds": 2, "outcome": "booked", "sentiment": "positive",
+        "call_duration_seconds": 354, "notes": "Reefer load, carrier confirmed temp settings.",
+        "timestamp": datetime.utcnow() - timedelta(days=1, hours=2),
+    },
+    # --- negotiation_failed (3) ---
+    {
+        "mc_number": "MC-662340", "carrier_name": "Desert Wind Trucking",
+        "load_id": "LD-007", "initial_rate_offered": 2700.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 3, "outcome": "negotiation_failed", "sentiment": "frustrated",
+        "call_duration_seconds": 412, "notes": "Carrier wanted $3,400. Too far apart.",
+        "timestamp": datetime.utcnow() - timedelta(days=5, hours=14),
+    },
+    {
+        "mc_number": "MC-117893", "carrier_name": "Rocky Mountain Express",
+        "load_id": "LD-010", "initial_rate_offered": 2500.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 3, "outcome": "negotiation_failed", "sentiment": "hostile",
+        "call_duration_seconds": 389, "notes": "Carrier became combative on round 3.",
+        "timestamp": datetime.utcnow() - timedelta(days=3, hours=16),
+    },
+    {
+        "mc_number": "MC-445678", "carrier_name": "Gulf Coast Carriers",
+        "load_id": "LD-013", "initial_rate_offered": 2300.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 3, "outcome": "negotiation_failed", "sentiment": "frustrated",
+        "call_duration_seconds": 445, "notes": "Rate gap could not be bridged.",
+        "timestamp": datetime.utcnow() - timedelta(days=1, hours=18),
+    },
+    # --- carrier_ineligible (2) ---
+    {
+        "mc_number": "MC-000124", "carrier_name": "Budget Haul Co",
+        "load_id": None, "initial_rate_offered": 1900.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 0, "outcome": "carrier_ineligible", "sentiment": "neutral",
+        "call_duration_seconds": 87, "notes": "FMCSA: authority not active.",
+        "timestamp": datetime.utcnow() - timedelta(days=6, hours=1),
+    },
+    {
+        "mc_number": "MC-883210", "carrier_name": "Sunrise Moving & Freight",
+        "load_id": None, "initial_rate_offered": 2050.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 0, "outcome": "carrier_ineligible", "sentiment": "neutral",
+        "call_duration_seconds": 94, "notes": "FMCSA: no insurance on file.",
+        "timestamp": datetime.utcnow() - timedelta(days=4, hours=20),
+    },
+    # --- no_match (2) ---
+    {
+        "mc_number": "MC-531097", "carrier_name": "Lakeside Flatbed LLC",
+        "load_id": None, "initial_rate_offered": 1800.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 0, "outcome": "no_match", "sentiment": "neutral",
+        "call_duration_seconds": 65, "notes": "Carrier only runs reefer; no dry van available.",
+        "timestamp": datetime.utcnow() - timedelta(days=5, hours=6),
+    },
+    {
+        "mc_number": "MC-720445", "carrier_name": "Northern Route Transport",
+        "load_id": None, "initial_rate_offered": 2200.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 0, "outcome": "no_match", "sentiment": "neutral",
+        "call_duration_seconds": 72, "notes": "No equipment available in origin area.",
+        "timestamp": datetime.utcnow() - timedelta(days=2, hours=12),
+    },
+    # --- hung_up (2) ---
+    {
+        "mc_number": "MC-194302", "carrier_name": "Fast Lane Freight",
+        "load_id": "LD-004", "initial_rate_offered": 1850.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 1, "outcome": "hung_up", "sentiment": "hostile",
+        "call_duration_seconds": 38, "notes": "Carrier hung up after first counter.",
+        "timestamp": datetime.utcnow() - timedelta(days=4, hours=4),
+    },
+    {
+        "mc_number": "MC-607812", "carrier_name": "Redline Haulers Inc",
+        "load_id": "LD-009", "initial_rate_offered": 1800.00, "final_agreed_rate": None,
+        "num_negotiation_rounds": 0, "outcome": "hung_up", "sentiment": "frustrated",
+        "call_duration_seconds": 21, "notes": "Disconnected immediately after rate quote.",
+        "timestamp": datetime.utcnow() - timedelta(days=1, hours=9),
+    },
+]
+
+
+def seed_sample_calls() -> None:
+    """
+    Insert 15 sample call log entries to make the dashboard look operational.
+
+    Idempotent — skips insertion entirely if the call_logs table already
+    contains any rows.
+    """
+    db = SessionLocal()
+    try:
+        existing_count = db.query(CallLogORM).count()
+        if existing_count > 0:
+            print(f"Skipped call log seed — {existing_count} record(s) already present.")
+            return
+
+        for data in SAMPLE_CALLS:
+            db.add(CallLogORM(call_id=str(uuid.uuid4()), **data))
+
+        db.commit()
+        print(f"Seeded {len(SAMPLE_CALLS)} sample call log(s).")
+    finally:
+        db.close()
+
+
 def seed(clear_existing: bool = False) -> None:
     """
     Insert seed loads into the database.
@@ -244,6 +383,8 @@ def seed(clear_existing: bool = False) -> None:
         print(f"Seeded {inserted} load(s). ({len(LOADS) - inserted} already existed)")
     finally:
         db.close()
+
+    seed_sample_calls()
 
 
 if __name__ == "__main__":
