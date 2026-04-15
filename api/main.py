@@ -274,6 +274,33 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
 
 
 @app.get(
+    "/calls/log",
+    response_model=list[CallLog],
+    tags=["Calls"],
+    summary="Retrieve recent call logs",
+    dependencies=[Depends(require_api_key)],
+)
+def list_calls(
+    limit: int = Query(20, ge=1, le=100, description="Number of records to return (max 100)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Return the most recent call logs ordered by timestamp descending.
+
+    Query parameters
+    ----------------
+    limit : Number of records to return. Defaults to 20, max 100.
+    """
+    rows = (
+        db.query(CallLogORM)
+        .order_by(CallLogORM.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+    return [_orm_to_call(row) for row in rows]
+
+
+@app.get(
     "/dashboard/metrics",
     response_model=DashboardMetrics,
     tags=["Dashboard"],
