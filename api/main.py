@@ -18,7 +18,7 @@ from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Query, Security, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from sqlalchemy import func
@@ -215,14 +215,34 @@ async def verify_carrier(mc_number: str):
     summary="Log a completed carrier call",
     dependencies=[Depends(require_api_key)],
 )
-def log_call(payload: CallLogCreate, db: Session = Depends(get_db)):
+async def log_call(request: Request, db: Session = Depends(get_db)):
     """
     Persist a call record after the AI agent completes a carrier interaction.
 
     A unique ``call_id`` (UUID4) and ``timestamp`` are auto-generated.
     The ``load_id``, if provided, is not validated against the loads table so
     that calls can be logged even for loads that were removed after the fact.
+
+    Accepts the raw request body so that empty strings sent by HappyRobot for
+    optional fields can be coerced to ``None`` before Pydantic validation.
     """
+    raw = await request.json()
+
+    # Convert empty strings to None for optional fields
+    for field in ["load_id", "final_agreed_rate", "notes"]:
+        if field in raw and raw[field] == "":
+            raw[field] = None
+
+    # Convert numeric strings to proper types
+    for field in ["initial_rate_offered", "final_agreed_rate"]:
+        if field in raw and isinstance(raw[field], str) and raw[field]:
+            raw[field] = float(raw[field])
+
+    for field in ["num_negotiation_rounds", "call_duration_seconds"]:
+        if field in raw and isinstance(raw[field], str) and raw[field]:
+            raw[field] = int(raw[field])
+
+    payload = CallLogCreate(**raw)
     row = CallLogORM(
         call_id=str(uuid.uuid4()),
         timestamp=datetime.utcnow(),
