@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -99,6 +100,33 @@ def create_tables() -> None:
 def drop_tables() -> None:
     """Drop all tables. Used by --reset in seed_data to apply schema changes."""
     Base.metadata.drop_all(bind=engine)
+
+
+def migrate_tables(engine) -> None:
+    """Add new columns to existing tables if they don't exist.
+
+    Safe to call on every startup — checks column existence before altering,
+    so it is a no-op when the schema is already current.
+    """
+    with engine.connect() as conn:
+        # Get existing columns in call_logs
+        result = conn.execute(text("PRAGMA table_info(call_logs)"))
+        existing_columns = [row[1] for row in result.fetchall()]
+
+        # Add missing columns
+        migrations = [
+            ("negotiation_summary", "TEXT"),
+            ("ai_sentiment", "VARCHAR"),
+            ("ai_confidence", "FLOAT"),
+        ]
+
+        for col_name, col_type in migrations:
+            if col_name not in existing_columns:
+                conn.execute(text(
+                    f"ALTER TABLE call_logs ADD COLUMN {col_name} {col_type}"
+                ))
+                conn.commit()
+                print(f"Migration: added column {col_name} to call_logs")
 
 
 def get_db():

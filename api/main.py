@@ -24,7 +24,7 @@ from fastapi.security import APIKeyHeader
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from api.database import CallLogORM, LoadORM, create_tables, get_db
+from api.database import CallLogORM, LoadORM, create_tables, migrate_tables, engine, get_db
 from api.fmcsa import lookup_carrier
 from api.models import (
     CallEnrichment,
@@ -62,8 +62,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup() -> None:
-    """Ensure all DB tables exist when the server starts."""
+    """Ensure all DB tables exist and schema is current when the server starts."""
     create_tables()
+    migrate_tables(engine)
 
 
 # ---------------------------------------------------------------------------

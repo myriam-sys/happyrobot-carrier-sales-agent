@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 import uuid
 
-from api.database import SessionLocal, create_tables, drop_tables, CallLogORM, LoadORM
+from api.database import SessionLocal, create_tables, drop_tables, migrate_tables, engine, CallLogORM, LoadORM
 
 
 LOADS: list[dict] = [
@@ -364,6 +364,7 @@ def seed(clear_existing: bool = False) -> None:
         clean reset during development.
     """
     create_tables()
+    migrate_tables(engine)
     db = SessionLocal()
     try:
         if clear_existing:
