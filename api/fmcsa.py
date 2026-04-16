@@ -68,11 +68,21 @@ def _parse_carrier(mc_number: str, content: dict[str, Any]) -> CarrierVerificati
     )
 
 
-def _mock_carrier(mc_number: str) -> CarrierVerification:
+_FMCSA_403_ERROR = (
+    "FMCSA API returned 403 — endpoint is geo-restricted outside the US or the API key "
+    "is invalid. Real carrier data unavailable. Using mock response based on MC number "
+    "parity. To test with real FMCSA data, deploy to a US region with a valid FMCSA "
+    "Query Central key. Mock MC numbers available: 11111 (eligible), 33333 (eligible), "
+    "55555 (eligible), 22222 (ineligible), 44444 (ineligible)."
+)
+
+
+def _mock_carrier(mc_number: str, fmcsa_error: Optional[str] = None) -> CarrierVerification:
     """
     Return a deterministic mock CarrierVerification based on the last digit of
     the MC number.  Odd last digit → eligible; even last digit → ineligible.
     Always sets ``is_mock=True`` so callers can distinguish real vs mock data.
+    ``fmcsa_error`` is populated when the mock was triggered by an API error.
     """
     numeric_mc = mc_number.upper().lstrip("MC-").lstrip("MC").strip()
     # Fall back to "0" (ineligible) if the number contains no digits
@@ -83,12 +93,13 @@ def _mock_carrier(mc_number: str) -> CarrierVerification:
     )
     return CarrierVerification(
         mc_number=mc_number,
-        dot_number="MOCK-001",
+        dot_number="MOCK-001" if eligible else "MOCK-002",
         legal_name="FastFreight Carriers LLC" if eligible else "Suspended Transport Inc",
         operating_status="ACTIVE" if eligible else "INACTIVE",
         insurance_on_file=eligible,
         is_eligible=eligible,
         is_mock=True,
+        fmcsa_error=fmcsa_error,
     )
 
 
@@ -108,13 +119,15 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
     Returns
     -------
     CarrierVerification | None
-        Parsed carrier record, or ``None`` if the carrier was not found or the
-        API key is not configured.
+        Parsed carrier record, or ``None`` if the carrier was not found (404)
+        or returned no content. On a 403, returns a mock record with
+        ``is_mock=True`` and ``fmcsa_error`` set to a descriptive message.
 
     Raises
     ------
     httpx.HTTPStatusError
-        Re-raised for non-404/403 HTTP errors so callers can decide how to handle.
+        Re-raised for non-404/403 HTTP errors (e.g. 500) so callers can decide
+        how to handle them.
     """
     if mock:
         logger.warning("FMCSA mock mode active for MC %s (explicit ?mock=true)", mc_number)
@@ -139,22 +152,19 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
         response = await client.get(url, params=params)
 
     if response.status_code == 404:
-        logger.warning("FMCSA returned 404 for MC %s — falling back to mock mode", mc_number)
-        return _mock_carrier(mc_number)
+        return None
 
     if response.status_code == 403:
         logger.warning(
-            "FMCSA returned 403 for MC %s (bad/expired key?) — falling back to mock mode",
-            mc_number,
+            "FMCSA returned 403 for MC %s — geo-restricted or invalid key", mc_number
         )
-        return _mock_carrier(mc_number)
+        return _mock_carrier(mc_number, fmcsa_error=_FMCSA_403_ERROR)
 
     response.raise_for_status()
 
     data = response.json()
     content: Optional[dict] = data.get("content")
     if not content:
-        logger.warning("FMCSA returned empty content for MC %s — falling back to mock mode", mc_number)
-        return _mock_carrier(mc_number)
+        return None
 
     return _parse_carrier(mc_number, content)

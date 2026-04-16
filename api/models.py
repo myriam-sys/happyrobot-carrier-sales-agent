@@ -142,6 +142,8 @@ class CarrierVerification(BaseModel):
     is_eligible: bool = False
     # True when the response was synthesised locally rather than returned by FMCSA
     is_mock: bool = False
+    # Set when the FMCSA API returned an error and a mock was used instead
+    fmcsa_error: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
