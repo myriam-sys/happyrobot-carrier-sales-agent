@@ -209,16 +209,26 @@ async def verify_carrier(mc_number: str):
         )
     return result
 
-# Temporary debug endpoint to test FMCSA integration without auth - remove before production.
-@app.get("/debug/verify/{mc_number}", tags=["Debug"])
+@app.get("/debug/verify/{mc_number}", tags=["Debug"],
+         dependencies=[Depends(require_api_key)])
 async def debug_verify(
     mc_number: str,
     mock: bool = Query(False, description="Force mock mode regardless of FMCSA key status"),
 ):
-    """Temporary debug endpoint - no auth - remove before production."""
+    """
+    FMCSA diagnostic endpoint. Calls FMCSA directly and returns the
+    full response including mock fallback status and any FMCSA errors.
+    Useful for verifying FMCSA connectivity and API key status.
+    Requires API key authentication via X-API-Key header.
+    """
     try:
         result = await lookup_carrier(mc_number, mock=mock)
-        return {"success": True, "mock": mock, "result": result}
+        return {
+            "success": result is not None,
+            "mock": result.is_mock if result else False,
+            "fmcsa_error": result.fmcsa_error if result else None,
+            "result": result,
+        }
     except Exception as e:
         return {"success": False, "mock": mock, "error": str(e)}
 

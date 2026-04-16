@@ -194,7 +194,7 @@ All endpoints except `/health` require an
 | POST | `/calls/enrich` | Apply AI Extract / AI Classify outputs to an existing call record | Yes |
 | GET | `/calls/log` | Retrieve recent call logs (default last 20, max 100) | Yes |
 | GET | `/dashboard/metrics` | Aggregated KPIs, outcome/sentiment breakdown, top lanes, AI quality metrics | Yes |
-| GET | `/debug/verify/{mc_number}` | FMCSA test endpoint; accepts `?mock=true` to force mock response | No |
+| GET | `/debug/verify/{mc_number}` | FMCSA diagnostic; returns mock status and `fmcsa_error` if applicable; accepts `?mock=true` | Yes |
 
 ---
 
