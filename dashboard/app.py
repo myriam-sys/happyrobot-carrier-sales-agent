@@ -469,7 +469,7 @@ with ai_left:
             f"  <div class='stat-row-value' style='color:{agree_color}'>"
             f"    {sentiment_agreement_rate:.1f}%"
             f"  </div>"
-            f"  <div style='font-size:11px;color:{C[\"muted\"]};margin-top:6px'>"
+            f"  <div style='font-size:11px;color:{C['muted']};margin-top:6px'>"
             f"    Agent sentiment vs. AI Classify"
             f"  </div>"
             f"</div>",
@@ -480,7 +480,7 @@ with ai_left:
             f"<div class='stat-row'>"
             f"  <div class='stat-row-label'>Sentiment Agreement Rate</div>"
             f"  <div class='stat-row-value'>&mdash;</div>"
-            f"  <div style='font-size:11px;color:{C[\"muted\"]};margin-top:6px'>"
+            f"  <div style='font-size:11px;color:{C['muted']};margin-top:6px'>"
             f"    No enriched calls yet"
             f"  </div>"
             f"</div>",
@@ -497,7 +497,7 @@ with ai_right:
     if recent_summaries:
         items_html = "".join(
             f"<div style='padding:10px 14px;border-bottom:1px solid {C['border']};font-size:13px;color:{C['dark']};line-height:1.5'>"
-            f"  <span style='color:{C[\"muted\"]};margin-right:8px;font-size:11px;font-weight:600'>{i+1}</span>{s}"
+            f"  <span style='color:{C['muted']};margin-right:8px;font-size:11px;font-weight:600'>{i+1}</span>{s}"
             f"</div>"
             for i, s in enumerate(recent_summaries)
         )
