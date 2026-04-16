@@ -12,8 +12,11 @@ dashboard for your team.
 This service acts as the data layer and decision engine behind a HappyRobot AI voice
 workflow. When a carrier calls in, the AI queries this API to find matching loads, verify
 carrier eligibility against FMCSA records, and log the outcome of every negotiation.
-Operations staff monitor activity in real time via a Streamlit dashboard without touching
-the call floor.
+After each call, a second pass through HappyRobot's AI Extract and AI Classify nodes
+enriches the call record with a one-sentence negotiation summary and an independent
+sentiment classification — surfaced in the dashboard's AI Quality Layer alongside a
+live sentiment agreement rate between agent-reported and AI-classified values.
+Operations staff monitor all activity in real time without touching the call floor.
 
 ---
 
@@ -34,7 +37,8 @@ the call floor.
                     |                       |
                     |  /loads               |
                     |  /verify-carrier      |
-                    |  /calls/log           |
+                    |  /calls/log  (POST)   |
+                    |  /calls/enrich        |
                     |  /dashboard/metrics   |
                     +-----------+-----------+
                                 |
@@ -46,8 +50,20 @@ the call floor.
                                 v
                     +-----------------------+
                     |  Streamlit Dashboard  |
-                    |  (Ops monitoring)     |
+                    |                       |
+                    |  KPIs / Charts        |
+                    |  AI Quality Layer     |
+                    |  Call Log             |
                     +-----------------------+
+
+Post-call enrichment loop (async, same workflow):
+
+    HappyRobot AI Extract + AI Classify
+               |
+               v
+    POST /calls/enrich
+    (writes negotiation_summary, ai_sentiment,
+     ai_confidence onto the existing call record)
 ```
 
 ---
@@ -98,6 +114,9 @@ cp .env.example .env
 
 # 5. Seed the database
 python -m api.seed_data
+
+# To reset the schema after a model change (drops + recreates all tables):
+python -m api.seed_data --reset
 
 # 6. Start the API
 uvicorn api.main:app --reload
@@ -168,13 +187,14 @@ All endpoints except `/health` require an
 | Method | Path | Description | Auth |
 |---|---|---|---|
 | GET | `/health` | Liveness check — returns `{"status": "ok"}` | No |
-| GET | `/loads` | List loads; filter by `origin`, `equipment_type`, `available_only` | Yes |
+| GET | `/loads` | List loads; returns `{loads, count, available}`; filter by `origin`, `equipment_type`, `available_only` | Yes |
 | GET | `/loads/{load_id}` | Fetch a single load by ID | Yes |
-| GET | `/verify-carrier/{mc_number}` | FMCSA carrier lookup with eligibility flag | Yes |
+| GET | `/verify-carrier/{mc_number}` | FMCSA carrier lookup with `is_eligible` flag and `is_mock` indicator | Yes |
 | POST | `/calls/log` | Record a completed call with negotiation outcome | Yes |
+| POST | `/calls/enrich` | Apply AI Extract / AI Classify outputs to an existing call record | Yes |
 | GET | `/calls/log` | Retrieve recent call logs (default last 20, max 100) | Yes |
-| GET | `/dashboard/metrics` | Aggregated KPIs, outcome/sentiment breakdown, top lanes | Yes |
-| GET | `/debug/verify/{mc_number}` | FMCSA test endpoint; accepts `?mock=true` | No |
+| GET | `/dashboard/metrics` | Aggregated KPIs, outcome/sentiment breakdown, top lanes, AI quality metrics | Yes |
+| GET | `/debug/verify/{mc_number}` | FMCSA test endpoint; accepts `?mock=true` to force mock response | No |
 
 ---
 
@@ -205,6 +225,8 @@ happyrobot-carrier-sales-agent/
 │   └── requirements.txt # Dashboard-only dependencies
 │
 ├── data/                # SQLite database (gitignored)
+├── docs/                # Client Supporting documents
+│   └── acme-logistics-solution.html # Solution brief (client-facing HTML)
 ├── Dockerfile           # API container
 ├── Dockerfile.dashboard # Dashboard container
 ├── docker-compose.yml   # Orchestrates API + dashboard
