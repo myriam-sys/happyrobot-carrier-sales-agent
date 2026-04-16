@@ -230,16 +230,18 @@ def _outcome(key: str) -> int:
 def _sentiment(key: str) -> int:
     return metrics.get("sentiment_breakdown", {}).get(key, 0)
 
-total_calls: int       = metrics.get("total_calls", 0)
-booked: int            = _outcome("booked")
-booking_rate: float    = (booked / total_calls * 100) if total_calls else 0.0
-avg_final_rate         = metrics.get("avg_final_rate_usd")
-avg_initial_rate       = metrics.get("avg_initial_rate_usd")
-avg_rounds: float      = metrics.get("avg_negotiation_rounds", 0.0)
-avg_duration_s: float  = metrics.get("avg_call_duration_seconds", 0.0)
-total_revenue: float   = metrics.get("total_revenue_booked_usd", 0.0)
-available_loads: int   = metrics.get("available_loads", 0)
-top_lanes: list[dict]  = metrics.get("top_lanes", [])
+total_calls: int          = metrics.get("total_calls", 0)
+booked: int               = _outcome("booked")
+booking_rate: float       = (booked / total_calls * 100) if total_calls else 0.0
+avg_final_rate            = metrics.get("avg_final_rate_usd")
+avg_initial_rate          = metrics.get("avg_initial_rate_usd")
+avg_rounds: float         = metrics.get("avg_negotiation_rounds", 0.0)
+avg_duration_s: float     = metrics.get("avg_call_duration_seconds", 0.0)
+total_revenue: float      = metrics.get("total_revenue_booked_usd", 0.0)
+available_loads: int      = metrics.get("available_loads", 0)
+top_lanes: list[dict]     = metrics.get("top_lanes", [])
+sentiment_agreement_rate  = metrics.get("sentiment_agreement_rate")   # float | None
+recent_summaries: list[str] = metrics.get("recent_summaries", [])
 
 now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -439,6 +441,76 @@ with col_stats:
             f"  <div class='stat-row-label'>{label}</div>"
             f"  <div class='stat-row-value'>{value}</div>"
             f"</div>",
+            unsafe_allow_html=True,
+        )
+
+# ---------------------------------------------------------------------------
+# AI Quality Layer
+# ---------------------------------------------------------------------------
+
+st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
+st.markdown(
+    "<p class='section-title'>AI Quality Layer</p>",
+    unsafe_allow_html=True,
+)
+
+ai_left, ai_right = st.columns([1, 2])
+
+with ai_left:
+    if sentiment_agreement_rate is not None:
+        agree_color = (
+            C["green"] if sentiment_agreement_rate >= 80
+            else C["orange"] if sentiment_agreement_rate >= 60
+            else C["red"]
+        )
+        st.markdown(
+            f"<div class='stat-row' style='border-top:3px solid {agree_color}'>"
+            f"  <div class='stat-row-label'>Sentiment Agreement Rate</div>"
+            f"  <div class='stat-row-value' style='color:{agree_color}'>"
+            f"    {sentiment_agreement_rate:.1f}%"
+            f"  </div>"
+            f"  <div style='font-size:11px;color:{C[\"muted\"]};margin-top:6px'>"
+            f"    Agent sentiment vs. AI Classify"
+            f"  </div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"<div class='stat-row'>"
+            f"  <div class='stat-row-label'>Sentiment Agreement Rate</div>"
+            f"  <div class='stat-row-value'>&mdash;</div>"
+            f"  <div style='font-size:11px;color:{C[\"muted\"]};margin-top:6px'>"
+            f"    No enriched calls yet"
+            f"  </div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+with ai_right:
+    st.markdown(
+        f"<div style='font-size:12px;font-weight:600;letter-spacing:0.05em;"
+        f"text-transform:uppercase;color:{C['muted']};margin-bottom:10px'>"
+        "Recent Negotiation Summaries</div>",
+        unsafe_allow_html=True,
+    )
+    if recent_summaries:
+        items_html = "".join(
+            f"<div style='padding:10px 14px;border-bottom:1px solid {C['border']};font-size:13px;color:{C['dark']};line-height:1.5'>"
+            f"  <span style='color:{C[\"muted\"]};margin-right:8px;font-size:11px;font-weight:600'>{i+1}</span>{s}"
+            f"</div>"
+            for i, s in enumerate(recent_summaries)
+        )
+        st.markdown(
+            f"<div style='background:#fff;border:1px solid {C['border']};"
+            f"border-radius:8px;overflow:hidden'>{items_html}</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"<div style='background:{C['surface']};border:1px solid {C['border']};"
+            f"border-radius:8px;padding:20px 16px;font-size:13px;color:{C['muted']}'>"
+            "No summaries yet. Summaries appear after calls are enriched via POST /calls/enrich.</div>",
             unsafe_allow_html=True,
         )
 

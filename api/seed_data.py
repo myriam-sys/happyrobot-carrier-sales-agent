@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 import uuid
 
-from api.database import SessionLocal, create_tables, CallLogORM, LoadORM
+from api.database import SessionLocal, create_tables, drop_tables, CallLogORM, LoadORM
 
 
 LOADS: list[dict] = [
@@ -388,5 +388,12 @@ def seed(clear_existing: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    clear = "--clear" in sys.argv
-    seed(clear_existing=clear)
+    if "--reset" in sys.argv:
+        drop_tables()
+        print("Dropped all tables.")
+        create_tables()
+        print("Recreated tables with current schema.")
+        seed_sample_calls()
+    else:
+        clear = "--clear" in sys.argv
+        seed(clear_existing=clear)

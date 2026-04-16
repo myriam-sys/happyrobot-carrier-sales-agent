@@ -104,8 +104,22 @@ class CallLogCreate(BaseModel):
 class CallLog(CallLogCreate):
     call_id: str
     timestamp: datetime
+    # AI enrichment — None until POST /calls/enrich is called
+    negotiation_summary: Optional[str] = None
+    ai_sentiment: Optional[str] = None
+    ai_confidence: Optional[float] = None
 
     model_config = {"from_attributes": True}
+
+
+class CallEnrichment(BaseModel):
+    call_id: str = Field(..., description="Matches an existing call log record")
+    extracted_mc_number: Optional[str] = None
+    extracted_load_id: Optional[str] = None
+    extracted_outcome: Optional[str] = None
+    negotiation_summary: str = Field(..., description="One-sentence AI Extract summary of the negotiation")
+    ai_sentiment: str = Field(..., description="AI Classify output: positive / neutral / frustrated / hostile")
+    ai_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Classifier confidence score (0–1)")
 
 
 # ---------------------------------------------------------------------------
@@ -168,3 +182,6 @@ class DashboardMetrics(BaseModel):
     top_lanes: list[TopLane]
     available_loads: int
     booked_loads: int
+    # AI quality layer
+    sentiment_agreement_rate: Optional[float] = None  # % where agent sentiment == ai_sentiment
+    recent_summaries: list[str] = []                  # last 5 negotiation_summary values

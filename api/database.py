@@ -81,6 +81,10 @@ class CallLogORM(Base):
     call_duration_seconds = Column(Integer, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     notes = Column(Text, nullable=True)
+    # AI enrichment fields — populated via POST /calls/enrich after the call
+    negotiation_summary = Column(Text, nullable=True)
+    ai_sentiment = Column(String, nullable=True)
+    ai_confidence = Column(Float, nullable=True)
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +94,11 @@ class CallLogORM(Base):
 def create_tables() -> None:
     """Create all tables if they don't already exist."""
     Base.metadata.create_all(bind=engine)
+
+
+def drop_tables() -> None:
+    """Drop all tables. Used by --reset in seed_data to apply schema changes."""
+    Base.metadata.drop_all(bind=engine)
 
 
 def get_db():

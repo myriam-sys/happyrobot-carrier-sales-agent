@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from api.database import CallLogORM, LoadORM, create_tables, get_db
 from api.fmcsa import lookup_carrier
 from api.models import (
+    CallEnrichment,
     CallLog,
     CallLogCreate,
     CarrierVerification,
@@ -273,6 +274,48 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
     return _orm_to_call(row)
 
 
+@app.post(
+    "/calls/enrich",
+    response_model=CallLog,
+    tags=["Calls"],
+    summary="Enrich a call log with AI Extract and AI Classify outputs",
+    dependencies=[Depends(require_api_key)],
+)
+def enrich_call(payload: CallEnrichment, db: Session = Depends(get_db)):
+    """
+    Apply HappyRobot AI Extract and AI Classify results to an existing call record.
+
+    Called after the voice interaction completes. Looks up the call by ``call_id``
+    and writes the AI-generated fields (negotiation summary, classified sentiment,
+    confidence score) onto the record. Also backfills ``mc_number``, ``load_id``,
+    and ``outcome`` from extraction if the original log left them unset.
+
+    Returns 404 if ``call_id`` does not match any call log.
+    """
+    row = db.get(CallLogORM, payload.call_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Call log '{payload.call_id}' not found.",
+        )
+
+    row.negotiation_summary = payload.negotiation_summary
+    row.ai_sentiment = payload.ai_sentiment
+    row.ai_confidence = payload.ai_confidence
+
+    # Backfill extracted fields only when the original record has no value
+    if payload.extracted_mc_number and row.mc_number in (None, "UNKNOWN"):
+        row.mc_number = payload.extracted_mc_number
+    if payload.extracted_load_id and not row.load_id:
+        row.load_id = payload.extracted_load_id
+    if payload.extracted_outcome and not row.outcome:
+        row.outcome = payload.extracted_outcome
+
+    db.commit()
+    db.refresh(row)
+    return _orm_to_call(row)
+
+
 @app.get(
     "/calls/log",
     response_model=list[CallLog],
@@ -364,6 +407,20 @@ def dashboard_metrics(db: Session = Depends(get_db)):
         reverse=True,
     )[:5]
 
+    # --- AI quality layer ---
+    enriched_calls = [c for c in calls if c.ai_sentiment]
+    if enriched_calls:
+        agreed = sum(1 for c in enriched_calls if c.sentiment == c.ai_sentiment)
+        sentiment_agreement_rate = round(agreed / len(enriched_calls) * 100, 1)
+    else:
+        sentiment_agreement_rate = None
+
+    recent_summaries = [
+        c.negotiation_summary
+        for c in sorted(calls, key=lambda c: c.timestamp, reverse=True)
+        if c.negotiation_summary
+    ][:5]
+
     # --- load board state ---
     available_loads = db.query(func.count(LoadORM.load_id)).filter(LoadORM.available == True).scalar() or 0  # noqa: E712
     booked_loads = db.query(func.count(LoadORM.load_id)).filter(LoadORM.available == False).scalar() or 0  # noqa: E712
@@ -391,4 +448,6 @@ def dashboard_metrics(db: Session = Depends(get_db)):
         top_lanes=top_lanes,
         available_loads=available_loads,
         booked_loads=booked_loads,
+        sentiment_agreement_rate=sentiment_agreement_rate,
+        recent_summaries=recent_summaries,
     )
