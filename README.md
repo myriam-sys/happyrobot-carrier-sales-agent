@@ -256,3 +256,52 @@ required.
 
 **Ephemeral storage on Railway free tier.** Each redeploy resets the filesystem.
 Call log history is lost unless you attach a persistent volume or migrate to Postgres.
+
+---
+
+## Testing Guide
+
+### Mock MC Numbers
+
+The FMCSA Query Central API is geo-restricted to US IP addresses.
+Requests from European infrastructure (including Railway EU regions)
+receive a 403 response. When this occurs, the API falls back to a
+deterministic mock response and includes a `fmcsa_error` field in
+the response explaining the situation.
+
+To test the full call flow regardless of FMCSA availability, use
+these mock MC numbers:
+
+| MC Number | Carrier Name | Eligible | Use Case |
+|---|---|---|---|
+| 11111 | FastFreight Carriers LLC | Yes | Standard booking flow |
+| 33333 | PrimeHaul Transport | Yes | Negotiation testing |
+| 55555 | Midwest Freight Co | Yes | No-match testing (use Reefer + Houston) |
+| 22222 | Suspended Transport Inc | No | Ineligible carrier flow |
+| 44444 | Revoked Carriers LLC | No | Ineligible carrier flow |
+
+When a mock response is returned, the API includes `"is_mock": true`
+in the payload. The `fmcsa_error` field contains a human-readable
+explanation of why the real FMCSA data was unavailable.
+
+### Verifying FMCSA Connectivity
+
+Use the diagnostic endpoint to check FMCSA status:
+
+```bash
+curl -X GET \
+  "https://your-api-url/debug/verify/11111" \
+  -H "X-API-Key: your-api-key"
+```
+
+If `fmcsa_error` is null in the response, FMCSA is reachable and
+returning real data. If `fmcsa_error` is present, the mock fallback
+is active.
+
+### Recommended Test Scenarios
+
+1. **Eligible carrier + matching load**: MC 11111, Dry Van, Chicago
+2. **Eligible carrier + no match**: MC 11111, Reefer, Houston
+3. **Ineligible carrier**: MC 22222, any equipment
+4. **Negotiation to deal**: MC 11111, Dry Van, Chicago — counter below $2,300
+5. **Negotiation failed**: MC 11111, Dry Van, Chicago — reject floor of $2,070
