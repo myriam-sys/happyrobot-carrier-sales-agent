@@ -1,6 +1,6 @@
 """
 HappyRobot — Carrier Sales Operations Dashboard
-Clean, professional Streamlit UI backed by the FastAPI metrics endpoint.
+Visual identity: DM Sans, #FAFAF8 background, muted dark palette.
 
 Run:
     streamlit run dashboard/app.py
@@ -28,56 +28,63 @@ API_BASE_URL: str = os.getenv(
 ).rstrip("/")
 API_KEY: str = os.getenv("API_KEY", "test-key-local")
 
-# Design tokens
+# Design tokens — HappyRobot visual identity
 C = {
-    "near_black": "#0f172a",
-    "dark":       "#1e293b",
-    "medium":     "#334155",
-    "muted":      "#64748b",
-    "border":     "#e2e8f0",
-    "surface":    "#f8fafc",
-    "green":      "#22c55e",
-    "red":        "#ef4444",
-    "orange":     "#f97316",
-    "blue":       "#3b82f6",
-    "slate":      "#94a3b8",
-    "gray":       "#64748b",
+    "bg":        "#FAFAF8",
+    "white":     "#FFFFFF",
+    "text":      "#0D0D0D",
+    "muted":     "#6B6B6B",
+    "border":    "#E8E8E4",
+    "accent":    "#1A1A1A",
+    "green":     "#2D6A4F",
+    "red":       "#C0392B",
+    "orange":    "#E67E22",
+    "gray":      "#95A5A6",
+    "sidebar_bg":"#F5F5F0",
 }
 
 OUTCOME_COLORS = {
-    "booked":              C["green"],
-    "negotiation_failed":  C["red"],
-    "carrier_ineligible":  C["orange"],
-    "no_match":            C["slate"],
-    "hung_up":             C["gray"],
+    "booked":             C["green"],
+    "negotiation_failed": C["red"],
+    "carrier_ineligible": C["orange"],
+    "no_match":           C["gray"],
+    "hung_up":            C["muted"],
 }
 SENTIMENT_COLORS = {
     "positive":  C["green"],
-    "neutral":   C["blue"],
+    "neutral":   C["gray"],
     "frustrated":C["orange"],
     "hostile":   C["red"],
 }
-OUTCOME_BADGE_BG = {
-    "booked":              ("#dcfce7", "#166534"),
-    "negotiation_failed":  ("#fee2e2", "#991b1b"),
-    "carrier_ineligible":  ("#ffedd5", "#9a3412"),
-    "no_match":            ("#f1f5f9", "#475569"),
-    "hung_up":             ("#f1f5f9", "#334155"),
+OUTCOME_BADGE = {
+    "booked":             ("#EDF7F2", C["green"]),
+    "negotiation_failed": ("#FDECEA", C["red"]),
+    "carrier_ineligible": ("#FEF0E6", C["orange"]),
+    "no_match":           ("#F5F5F5", C["muted"]),
+    "hung_up":            ("#F5F5F5", "#4A4A4A"),
 }
-SENTIMENT_BADGE_BG = {
-    "positive":  ("#dcfce7", "#166534"),
-    "neutral":   ("#dbeafe", "#1e40af"),
-    "frustrated":("#ffedd5", "#9a3412"),
-    "hostile":   ("#fee2e2", "#991b1b"),
+SENTIMENT_BADGE = {
+    "positive":  ("#EDF7F2", C["green"]),
+    "neutral":   ("#F5F5F5", C["muted"]),
+    "frustrated":("#FEF0E6", C["orange"]),
+    "hostile":   ("#FDECEA", C["red"]),
 }
 
 CHART_BASE = dict(
     template="plotly_white",
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Inter, sans-serif", color=C["medium"]),
-    margin=dict(l=10, r=10, t=44, b=10),
+    font=dict(family="DM Sans, sans-serif", color=C["muted"], size=12),
+    margin=dict(l=8, r=8, t=36, b=8),
 )
+
+LOGO_SVG = """
+<svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"
+     style="flex-shrink:0;margin-top:3px">
+  <path d="M8 4C8 4 4 4 4 8v8c0 4 4 4 4 4s4 0 4-4V8c0-4-4-4-4-4z" fill="#1A1A1A"/>
+  <path d="M20 12c0 0-4 0-4 4v8c0 4 4 4 4 4s4 0 4-4v-8c0-4-4-4-4-4z" fill="#1A1A1A"/>
+</svg>
+"""
 
 # ---------------------------------------------------------------------------
 # Page config + global CSS
@@ -90,98 +97,137 @@ st.set_page_config(
 )
 
 st.markdown(
-    """
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    f"""
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap"
           rel="stylesheet">
     <style>
-        html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+        html, body, [class*="css"] {{
+            font-family: 'DM Sans', sans-serif;
+            background-color: {C["bg"]};
+        }}
+
+        /* Page background */
+        .stApp {{ background-color: {C["bg"]}; }}
+
+        /* Sidebar */
+        [data-testid="stSidebar"] {{
+            background-color: {C["sidebar_bg"]} !important;
+        }}
+        [data-testid="stSidebar"] * {{
+            font-family: 'DM Sans', sans-serif !important;
+        }}
 
         /* Hide Streamlit chrome */
-        #MainMenu { visibility: hidden; }
-        footer    { visibility: hidden; }
+        #MainMenu {{ visibility: hidden; }}
+        footer    {{ visibility: hidden; }}
+        header    {{ visibility: hidden; }}
 
-        /* KPI card */
-        .kpi-card {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
+        /* KPI card — no colored top border */
+        .kpi-card {{
+            background: {C["white"]};
+            border: 1px solid {C["border"]};
             border-radius: 8px;
-            padding: 20px 20px 16px;
-            height: 110px;
-        }
-        .kpi-label {
+            padding: 20px 20px 18px;
+            min-height: 100px;
+        }}
+        .kpi-label {{
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: {C["muted"]};
+            margin-bottom: 10px;
+        }}
+        .kpi-value {{
+            font-size: 28px;
+            font-weight: 700;
+            color: {C["text"]};
+            line-height: 1;
+        }}
+
+        /* Section label */
+        .section-label {{
             font-size: 11px;
             font-weight: 600;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: #64748b;
-            margin-bottom: 8px;
-        }
-        .kpi-value {
-            font-size: 26px;
-            font-weight: 700;
-            color: #0f172a;
-            line-height: 1;
-        }
-
-        /* Section header */
-        .section-title {
-            font-size: 13px;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            color: #64748b;
-            margin: 0 0 12px;
-        }
+            color: {C["muted"]};
+            margin: 0 0 14px;
+        }}
 
         /* Badge */
-        .badge {
+        .badge {{
             display: inline-block;
-            padding: 2px 10px;
+            padding: 2px 9px;
             border-radius: 9999px;
             font-size: 11px;
             font-weight: 600;
-            letter-spacing: 0.04em;
-        }
+            letter-spacing: 0.03em;
+        }}
 
-        /* Stat row */
-        .stat-row {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
+        /* Stat card */
+        .stat-card {{
+            background: {C["white"]};
+            border: 1px solid {C["border"]};
             border-radius: 8px;
             padding: 16px 20px;
             margin-bottom: 10px;
-        }
-        .stat-row-label {
-            font-size: 12px;
-            color: #64748b;
-            margin-bottom: 4px;
-        }
-        .stat-row-value {
-            font-size: 20px;
+        }}
+        .stat-card-label {{
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: {C["muted"]};
+            margin-bottom: 6px;
+        }}
+        .stat-card-value {{
+            font-size: 22px;
             font-weight: 700;
-            color: #0f172a;
-        }
+            color: {C["text"]};
+        }}
 
         /* Table */
-        .log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .log-table th {
+        .log-table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }}
+        .log-table th {{
             text-align: left;
             font-size: 11px;
             font-weight: 600;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.07em;
             text-transform: uppercase;
-            color: #64748b;
-            border-bottom: 1px solid #e2e8f0;
+            color: {C["muted"]};
+            border-bottom: 1px solid {C["border"]};
             padding: 8px 12px;
-        }
-        .log-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #f1f5f9;
-            color: #1e293b;
+            background: transparent;
+        }}
+        .log-table td {{
+            padding: 11px 12px;
+            border-bottom: 1px solid {C["border"]};
+            color: {C["text"]};
             vertical-align: middle;
-        }
-        .log-table tr:last-child td { border-bottom: none; }
-        .log-table tr:hover td    { background: #f8fafc; }
+            background: transparent;
+        }}
+        .log-table tr:last-child td {{ border-bottom: none; }}
+
+        /* Summary list */
+        .summary-item {{
+            padding: 10px 14px;
+            border-bottom: 1px solid {C["border"]};
+            font-size: 13px;
+            color: {C["text"]};
+            line-height: 1.55;
+        }}
+        .summary-item:last-child {{ border-bottom: none; }}
+        .summary-num {{
+            font-size: 11px;
+            font-weight: 600;
+            color: {C["muted"]};
+            margin-right: 10px;
+        }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -230,20 +276,29 @@ def _outcome(key: str) -> int:
 def _sentiment(key: str) -> int:
     return metrics.get("sentiment_breakdown", {}).get(key, 0)
 
-total_calls: int          = metrics.get("total_calls", 0)
-booked: int               = _outcome("booked")
-booking_rate: float       = (booked / total_calls * 100) if total_calls else 0.0
-avg_final_rate            = metrics.get("avg_final_rate_usd")
-avg_initial_rate          = metrics.get("avg_initial_rate_usd")
-avg_rounds: float         = metrics.get("avg_negotiation_rounds", 0.0)
-avg_duration_s: float     = metrics.get("avg_call_duration_seconds", 0.0)
-total_revenue: float      = metrics.get("total_revenue_booked_usd", 0.0)
-available_loads: int      = metrics.get("available_loads", 0)
-top_lanes: list[dict]     = metrics.get("top_lanes", [])
-sentiment_agreement_rate  = metrics.get("sentiment_agreement_rate")   # float | None
+total_calls: int            = metrics.get("total_calls", 0)
+booked: int                 = _outcome("booked")
+booking_rate: float         = (booked / total_calls * 100) if total_calls else 0.0
+avg_final_rate              = metrics.get("avg_final_rate_usd")
+avg_initial_rate            = metrics.get("avg_initial_rate_usd")
+avg_rounds: float           = metrics.get("avg_negotiation_rounds", 0.0)
+avg_duration_s: float       = metrics.get("avg_call_duration_seconds", 0.0)
+total_revenue: float        = metrics.get("total_revenue_booked_usd", 0.0)
+available_loads: int        = metrics.get("available_loads", 0)
+top_lanes: list[dict]       = metrics.get("top_lanes", [])
+sentiment_agreement_rate    = metrics.get("sentiment_agreement_rate")
 recent_summaries: list[str] = metrics.get("recent_summaries", [])
 
 now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# Short aliases — avoids backslash-escaped quotes inside f-string expressions
+_text   = C["text"]
+_muted  = C["muted"]
+_border = C["border"]
+_white  = C["white"]
+_green  = C["green"]
+_orange = C["orange"]
+_red    = C["red"]
 
 # ---------------------------------------------------------------------------
 # Sidebar
@@ -251,38 +306,32 @@ now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 with st.sidebar:
     st.markdown(
-        f"<p style='font-size:18px;font-weight:700;color:{C['near_black']};margin-bottom:4px'>"
-        "Carrier Sales Ops</p>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f"<p style='font-size:12px;color:{C['muted']};margin-top:0'>HappyRobot AI</p>",
+        f"<p style='font-size:15px;font-weight:700;color:{C['text']};margin-bottom:2px;line-height:1.3'>"
+        "Carrier Sales Ops</p>"
+        f"<p style='font-size:12px;color:{C['muted']};margin:0 0 20px'>HappyRobot AI</p>",
         unsafe_allow_html=True,
     )
 
-    st.markdown("---")
-
-    if st.button("Refresh", use_container_width=True):
+    if st.button("Refresh data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
     st.markdown(
-        f"<p style='font-size:12px;color:{C['muted']};margin-top:8px'>"
-        f"Updated: {now_str}</p>",
+        f"<p style='font-size:12px;color:{C['muted']};margin-top:10px'>Updated: {now_str}</p>",
         unsafe_allow_html=True,
     )
 
-    status_color = C["green"] if api_ok else C["red"]
-    status_label = "API Connected" if api_ok else "API Unreachable"
+    dot_color = C["green"] if api_ok else C["red"]
+    status_label = "API connected" if api_ok else "API unreachable"
     st.markdown(
-        f"<p style='font-size:12px;font-weight:500;color:{status_color}'>"
+        f"<p style='font-size:12px;font-weight:500;color:{dot_color};margin-top:4px'>"
         f"&#9679; {status_label}</p>",
         unsafe_allow_html=True,
     )
 
-    st.markdown("---")
+    st.markdown(f"<hr style='border:none;border-top:1px solid {C['border']};margin:16px 0'>", unsafe_allow_html=True)
     st.markdown(
-        f"<p style='font-size:11px;color:{C['muted']}'>Data updates on every call logged</p>",
+        f"<p style='font-size:11px;color:{C['muted']}'>Data refreshes on every call logged.</p>",
         unsafe_allow_html=True,
     )
 
@@ -291,48 +340,48 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 
 st.markdown(
-    f"<h1 style='font-family:Inter,sans-serif;font-size:28px;font-weight:700;"
-    f"color:{C['near_black']};margin-bottom:4px;line-height:1.2'>"
-    "Carrier Sales Operations</h1>",
-    unsafe_allow_html=True,
-)
-st.markdown(
-    f"<p style='font-family:Inter,sans-serif;font-size:14px;font-weight:400;"
-    f"color:{C['muted']};margin-top:0;margin-bottom:20px'>"
-    "Powered by HappyRobot AI &mdash; Acme Freight Brokerage</p>",
+    f"<div style='display:flex;align-items:flex-start;gap:12px;margin-bottom:4px'>"
+    f"  {LOGO_SVG}"
+    f"  <div>"
+    f"    <h1 style='font-family:DM Sans,sans-serif;font-size:26px;font-weight:700;"
+    f"        color:{C['text']};margin:0;letter-spacing:-0.02em;line-height:1.2'>"
+    f"      Carrier Sales Operations</h1>"
+    f"    <p style='font-family:DM Sans,sans-serif;font-size:13px;font-weight:400;"
+    f"        color:{C['muted']};margin:3px 0 0'>"
+    f"      Acme Freight Brokerage &mdash; Powered by HappyRobot</p>"
+    f"  </div>"
+    f"</div>",
     unsafe_allow_html=True,
 )
 
 if not api_ok:
     st.error(
-        "Could not reach the API. Displaying zero/empty data. "
-        f"Check that the backend is running at {API_BASE_URL} and that your API key is correct."
+        "Could not reach the API. Displaying empty data. "
+        f"Check the backend is running at {API_BASE_URL} and the API key is set correctly."
     )
+
+st.markdown("<div style='margin:20px 0 4px'></div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Row 1 — KPI cards
 # ---------------------------------------------------------------------------
 
-def kpi_card(label: str, value: str, accent: str) -> str:
+def kpi(label: str, value: str) -> str:
     return (
-        f"<div class='kpi-card' style='border-top:3px solid {accent}'>"
+        f"<div class='kpi-card'>"
         f"  <div class='kpi-label'>{label}</div>"
         f"  <div class='kpi-value'>{value}</div>"
         f"</div>"
     )
 
 k1, k2, k3, k4, k5 = st.columns(5)
+k1.markdown(kpi("Total Calls", f"{total_calls:,}"), unsafe_allow_html=True)
+k2.markdown(kpi("Booking Rate", f"{booking_rate:.1f}%"), unsafe_allow_html=True)
+k3.markdown(kpi("Avg Final Rate", f"${avg_final_rate:,.0f}" if avg_final_rate else "&mdash;"), unsafe_allow_html=True)
+k4.markdown(kpi("Avg Rounds", f"{avg_rounds:.1f}"), unsafe_allow_html=True)
+k5.markdown(kpi("Revenue Booked", f"${total_revenue:,.0f}"), unsafe_allow_html=True)
 
-k1.markdown(kpi_card("Total Calls", f"{total_calls:,}", C["blue"]), unsafe_allow_html=True)
-k2.markdown(kpi_card("Booking Rate", f"{booking_rate:.1f}%", C["green"]), unsafe_allow_html=True)
-k3.markdown(
-    kpi_card("Avg Final Rate", f"${avg_final_rate:,.0f}" if avg_final_rate else "&mdash;", C["blue"]),
-    unsafe_allow_html=True,
-)
-k4.markdown(kpi_card("Avg Negotiation Rounds", f"{avg_rounds:.1f}", C["orange"]), unsafe_allow_html=True)
-k5.markdown(kpi_card("Total Revenue Booked", f"${total_revenue:,.0f}", C["green"]), unsafe_allow_html=True)
-
-st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Row 2 — Outcome bar + Sentiment donut
@@ -354,12 +403,15 @@ with col_left:
             marker_color=outcome_colors,
             text=outcome_values,
             textposition="outside",
+            textfont=dict(size=12, color=C["muted"]),
         )
     )
     fig_outcomes.update_layout(
-        title=dict(text="Call Outcomes", font=dict(size=14, weight="bold")),
-        xaxis=dict(title="Calls", showgrid=False, zeroline=False),
-        yaxis=dict(autorange="reversed", showgrid=False),
+        title=dict(text="Call Outcomes", font=dict(size=13, weight="bold", color=C["text"])),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                   showline=True, linecolor=C["border"]),
+        yaxis=dict(showgrid=False, autorange="reversed",
+                   tickfont=dict(size=12, color=C["muted"])),
         **CHART_BASE,
     )
     st.plotly_chart(fig_outcomes, use_container_width=True)
@@ -374,14 +426,14 @@ with col_right:
         go.Pie(
             labels=sentiment_labels,
             values=sentiment_values,
-            hole=0.52,
+            hole=0.55,
             marker_colors=sentiment_colors,
             textinfo="label+percent",
             textfont=dict(size=12),
         )
     )
     fig_sentiment.update_layout(
-        title=dict(text="Carrier Sentiment", font=dict(size=14, weight="bold")),
+        title=dict(text="Carrier Sentiment", font=dict(size=13, weight="bold", color=C["text"])),
         **CHART_BASE,
     )
     st.plotly_chart(fig_sentiment, use_container_width=True)
@@ -405,41 +457,43 @@ with col_lanes:
                 orientation="h",
                 marker=dict(
                     color=lane_booked,
-                    colorscale=[[0, C["slate"]], [1, C["green"]]],
+                    colorscale=[[0, C["border"]], [1, C["green"]]],
                     showscale=True,
-                    colorbar=dict(title="Booked", thickness=12),
+                    colorbar=dict(title="Booked", thickness=10,
+                                  tickfont=dict(size=11, color=C["muted"])),
                 ),
-                text=[f"{c} calls / {b} booked" for c, b in zip(lane_calls, lane_booked)],
+                text=[f"{c} calls" for c in lane_calls],
                 textposition="outside",
+                textfont=dict(size=12, color=C["muted"]),
             )
         )
         fig_lanes.update_layout(
-            title=dict(text="Top Lanes by Volume", font=dict(size=14, weight="bold")),
-            xaxis=dict(title="Calls", showgrid=False, zeroline=False),
-            yaxis=dict(autorange="reversed", showgrid=False),
+            title=dict(text="Top Lanes by Volume", font=dict(size=13, weight="bold", color=C["text"])),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                       showline=True, linecolor=C["border"]),
+            yaxis=dict(showgrid=False, autorange="reversed",
+                       tickfont=dict(size=12, color=C["muted"])),
             **CHART_BASE,
         )
         st.plotly_chart(fig_lanes, use_container_width=True)
     else:
-        st.info("No lane data yet — call logs with load IDs will appear here.")
+        st.info("No lane data yet. Call logs with load IDs will populate this chart.")
 
 with col_stats:
     st.markdown(
-        "<p class='section-title'>Load Board &amp; Call Stats</p>",
+        f"<p class='section-label'>Load Board &amp; Call Stats</p>",
         unsafe_allow_html=True,
     )
-
     mins, secs = divmod(int(avg_duration_s), 60)
-
     for label, value in [
-        ("Available Loads on Board",  str(available_loads)),
-        ("Avg Initial Rate Offered",  f"${avg_initial_rate:,.0f}" if avg_initial_rate else "&mdash;"),
-        ("Avg Call Duration",         f"{mins} min {secs}s"),
+        ("Available Loads",        str(available_loads)),
+        ("Avg Initial Rate",       f"${avg_initial_rate:,.0f}" if avg_initial_rate else "&mdash;"),
+        ("Avg Call Duration",      f"{mins}m {secs}s"),
     ]:
         st.markdown(
-            f"<div class='stat-row'>"
-            f"  <div class='stat-row-label'>{label}</div>"
-            f"  <div class='stat-row-value'>{value}</div>"
+            f"<div class='stat-card'>"
+            f"  <div class='stat-card-label'>{label}</div>"
+            f"  <div class='stat-card-value'>{value}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -450,7 +504,7 @@ with col_stats:
 
 st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
 st.markdown(
-    "<p class='section-title'>AI Quality Layer</p>",
+    f"<p class='section-label'>AI Quality Layer</p>",
     unsafe_allow_html=True,
 )
 
@@ -464,23 +518,23 @@ with ai_left:
             else C["red"]
         )
         st.markdown(
-            f"<div class='stat-row' style='border-top:3px solid {agree_color}'>"
-            f"  <div class='stat-row-label'>Sentiment Agreement Rate</div>"
-            f"  <div class='stat-row-value' style='color:{agree_color}'>"
+            f"<div class='stat-card'>"
+            f"  <div class='stat-card-label'>Sentiment Agreement Rate</div>"
+            f"  <div class='stat-card-value' style='color:{agree_color}'>"
             f"    {sentiment_agreement_rate:.1f}%"
             f"  </div>"
-            f"  <div style='font-size:11px;color:{C['muted']};margin-top:6px'>"
-            f"    Agent sentiment vs. AI Classify"
+            f"  <div style='font-size:11px;color:{_muted};margin-top:6px'>"
+            f"    Agent vs. AI Classify"
             f"  </div>"
             f"</div>",
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            f"<div class='stat-row'>"
-            f"  <div class='stat-row-label'>Sentiment Agreement Rate</div>"
-            f"  <div class='stat-row-value'>&mdash;</div>"
-            f"  <div style='font-size:11px;color:{C['muted']};margin-top:6px'>"
+            f"<div class='stat-card'>"
+            f"  <div class='stat-card-label'>Sentiment Agreement Rate</div>"
+            f"  <div class='stat-card-value'>&mdash;</div>"
+            f"  <div style='font-size:11px;color:{_muted};margin-top:6px'>"
             f"    No enriched calls yet"
             f"  </div>"
             f"</div>",
@@ -489,28 +543,27 @@ with ai_left:
 
 with ai_right:
     st.markdown(
-        f"<div style='font-size:12px;font-weight:600;letter-spacing:0.05em;"
-        f"text-transform:uppercase;color:{C['muted']};margin-bottom:10px'>"
-        "Recent Negotiation Summaries</div>",
+        f"<p class='section-label'>Recent Negotiation Summaries</p>",
         unsafe_allow_html=True,
     )
     if recent_summaries:
         items_html = "".join(
-            f"<div style='padding:10px 14px;border-bottom:1px solid {C['border']};font-size:13px;color:{C['dark']};line-height:1.5'>"
-            f"  <span style='color:{C['muted']};margin-right:8px;font-size:11px;font-weight:600'>{i+1}</span>{s}"
+            f"<div class='summary-item'>"
+            f"  <span class='summary-num'>{i + 1}</span>{s}"
             f"</div>"
             for i, s in enumerate(recent_summaries)
         )
         st.markdown(
-            f"<div style='background:#fff;border:1px solid {C['border']};"
+            f"<div style='background:{C['white']};border:1px solid {C['border']};"
             f"border-radius:8px;overflow:hidden'>{items_html}</div>",
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            f"<div style='background:{C['surface']};border:1px solid {C['border']};"
+            f"<div style='background:{C['white']};border:1px solid {C['border']};"
             f"border-radius:8px;padding:20px 16px;font-size:13px;color:{C['muted']}'>"
-            "No summaries yet. Summaries appear after calls are enriched via POST /calls/enrich.</div>",
+            "No summaries yet. Summaries appear after calls are enriched via POST /calls/enrich."
+            "</div>",
             unsafe_allow_html=True,
         )
 
@@ -519,10 +572,7 @@ with ai_right:
 # ---------------------------------------------------------------------------
 
 st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
-st.markdown(
-    "<p class='section-title'>Recent Call Log</p>",
-    unsafe_allow_html=True,
-)
+st.markdown(f"<p class='section-label'>Recent Call Log</p>", unsafe_allow_html=True)
 
 def badge(text: str, bg: str, fg: str) -> str:
     return (
@@ -533,61 +583,50 @@ def badge(text: str, bg: str, fg: str) -> str:
 if call_logs:
     rows_html = ""
     for c in call_logs:
-        ts = c.get("timestamp", "")[:16].replace("T", " ")
-        carrier  = c.get("carrier_name", "&mdash;")
-        load_id  = c.get("load_id") or "&mdash;"
-        outcome  = c.get("outcome", "")
-        sentiment= c.get("sentiment", "")
-        rate     = c.get("final_agreed_rate")
-        dur_s    = c.get("call_duration_seconds", 0)
+        ts        = c.get("timestamp", "")[:16].replace("T", " ")
+        carrier   = c.get("carrier_name", "&mdash;")
+        load_id   = c.get("load_id") or "&mdash;"
+        outcome   = c.get("outcome", "")
+        sentiment = c.get("sentiment", "")
+        rate      = c.get("final_agreed_rate")
+        dur_s     = c.get("call_duration_seconds", 0)
         dur_m, dur_rem = divmod(int(dur_s), 60)
 
-        obg, ofg = OUTCOME_BADGE_BG.get(outcome, ("#f1f5f9", "#334155"))
-        sbg, sfg = SENTIMENT_BADGE_BG.get(sentiment, ("#f1f5f9", "#334155"))
-
+        obg, ofg = OUTCOME_BADGE.get(outcome, ("#F5F5F5", C["muted"]))
+        sbg, sfg = SENTIMENT_BADGE.get(sentiment, ("#F5F5F5", C["muted"]))
         rate_str = f"${rate:,.0f}" if rate is not None else "&mdash;"
         dur_str  = f"{dur_m}m {dur_rem}s" if dur_m else f"{dur_rem}s"
 
         rows_html += (
             f"<tr>"
-            f"  <td style='color:{C['muted']};font-size:12px'>{ts}</td>"
-            f"  <td style='font-weight:500'>{carrier}</td>"
-            f"  <td style='color:{C['muted']}'>{load_id}</td>"
+            f"  <td style='color:{_muted};font-size:12px'>{ts}</td>"
+            f"  <td style='font-weight:500;color:{_text}'>{carrier}</td>"
+            f"  <td style='color:{_muted}'>{load_id}</td>"
             f"  <td>{badge(outcome, obg, ofg)}</td>"
-            f"  <td style='font-weight:600;color:{C['near_black']}'>{rate_str}</td>"
+            f"  <td style='font-weight:600;color:{_text}'>{rate_str}</td>"
             f"  <td>{badge(sentiment, sbg, sfg)}</td>"
-            f"  <td style='color:{C['muted']}'>{dur_str}</td>"
+            f"  <td style='color:{_muted}'>{dur_str}</td>"
             f"</tr>"
         )
 
     st.markdown(
-        f"""
-        <div style='background:#ffffff;border:1px solid {C['border']};
-                    border-radius:8px;overflow:hidden;padding:4px 0'>
-          <table class='log-table'>
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>Carrier</th>
-                <th>Load ID</th>
-                <th>Outcome</th>
-                <th>Final Rate</th>
-                <th>Sentiment</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
-            <tbody>{rows_html}</tbody>
-          </table>
-        </div>
-        """,
+        f"<div style='background:{_white};border:1px solid {_border};"
+        f"border-radius:8px;overflow:hidden'>"
+        f"<table class='log-table'>"
+        f"<thead><tr>"
+        f"<th>Timestamp</th><th>Carrier</th><th>Load</th>"
+        f"<th>Outcome</th><th>Final Rate</th><th>Sentiment</th><th>Duration</th>"
+        f"</tr></thead>"
+        f"<tbody>{rows_html}</tbody>"
+        f"</table></div>",
         unsafe_allow_html=True,
     )
 else:
     st.markdown(
-        f"<div style='background:#f8fafc;border:1px solid {C['border']};"
+        f"<div style='background:{_white};border:1px solid {_border};"
         f"border-radius:8px;padding:32px;text-align:center;"
-        f"color:{C['muted']};font-size:14px'>"
-        "No call logs yet. Calls logged by the AI agent will appear here."
+        f"font-size:14px;color:{_muted}'>"
+        "No call logs yet. Calls handled by the AI agent will appear here."
         "</div>",
         unsafe_allow_html=True,
     )
