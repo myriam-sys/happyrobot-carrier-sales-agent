@@ -76,6 +76,12 @@ _FMCSA_403_ERROR = (
     "55555 (eligible), 22222 (ineligible), 44444 (ineligible)."
 )
 
+_FMCSA_404_ERROR = (
+    "MC number not found in FMCSA records. This may be a test MC number "
+    "or the carrier may not be registered. Using mock response based on "
+    "MC number parity. See README for available test MC numbers."
+)
+
 
 def _mock_carrier(mc_number: str, fmcsa_error: Optional[str] = None) -> CarrierVerification:
     """
@@ -119,9 +125,10 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
     Returns
     -------
     CarrierVerification | None
-        Parsed carrier record, or ``None`` if the carrier was not found (404)
-        or returned no content. On a 403, returns a mock record with
-        ``is_mock=True`` and ``fmcsa_error`` set to a descriptive message.
+        Parsed carrier record. On 404 (MC not found) or 403 (geo-restricted /
+        invalid key), returns a mock record with ``is_mock=True`` and
+        ``fmcsa_error`` set to a descriptive message. Returns ``None`` only
+        when ``mc_number`` is empty or contains no digits.
 
     Raises
     ------
@@ -145,6 +152,10 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
     # Strip common prefixes; FMCSA expects the numeric portion only
     numeric_mc = mc_number.upper().lstrip("MC-").lstrip("MC").strip()
 
+    # Return None only for empty or non-numeric MC numbers — no mock makes sense here
+    if not numeric_mc or not any(c.isdigit() for c in numeric_mc):
+        return None
+
     url = f"{FMCSA_BASE_URL}/{numeric_mc}"
     params = {"webKey": FMCSA_API_KEY}
 
@@ -152,7 +163,8 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
         response = await client.get(url, params=params)
 
     if response.status_code == 404:
-        return None
+        logger.warning("FMCSA returned 404 for MC %s — not found, falling back to mock", mc_number)
+        return _mock_carrier(mc_number, fmcsa_error=_FMCSA_404_ERROR)
 
     if response.status_code == 403:
         logger.warning(
