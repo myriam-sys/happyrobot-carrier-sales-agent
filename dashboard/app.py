@@ -117,10 +117,33 @@ st.markdown(
             font-family: 'DM Sans', sans-serif !important;
         }}
 
-        /* Hide Streamlit chrome */
+        /* Hide Streamlit chrome — keep sidebar toggle visible */
         #MainMenu {{ visibility: hidden; }}
         footer    {{ visibility: hidden; }}
-        header    {{ visibility: hidden; }}
+
+        /* Transparent header — hides title bar but preserves the collapse button */
+        [data-testid="stHeader"] {{
+            background: transparent !important;
+            border-bottom: none !important;
+        }}
+
+        /* Style the sidebar collapse/expand toggle as a clean arrow */
+        [data-testid="collapsedControl"] {{
+            background: {C["white"]} !important;
+            border: 1px solid {C["border"]} !important;
+            border-radius: 50% !important;
+            width: 28px !important;
+            height: 28px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: none !important;
+            color: {C["muted"]} !important;
+        }}
+        [data-testid="collapsedControl"]:hover {{
+            border-color: {C["accent"]} !important;
+            color: {C["accent"]} !important;
+        }}
 
         /* KPI card — no colored top border */
         .kpi-card {{
