@@ -138,11 +138,30 @@ st.markdown(
             align-items: center !important;
             justify-content: center !important;
             box-shadow: none !important;
-            color: {C["muted"]} !important;
+            overflow: hidden !important;
         }}
         [data-testid="collapsedControl"]:hover {{
             border-color: {C["accent"]} !important;
-            color: {C["accent"]} !important;
+            background: {C["bg"]} !important;
+        }}
+        /* Hide the raw Material Icon text (keyboard_double_arrow_*) */
+        [data-testid="collapsedControl"] span,
+        [data-testid="collapsedControl"] svg {{
+            display: none !important;
+        }}
+        /* Inject a clean chevron via pseudo-element */
+        [data-testid="collapsedControl"]::after {{
+            content: "" !important;
+            display: block !important;
+            width: 10px !important;
+            height: 10px !important;
+            border-top: 2px solid {C["muted"]} !important;
+            border-right: 2px solid {C["muted"]} !important;
+            transform: rotate(225deg) !important;
+            margin-left: 2px !important;
+        }}
+        [data-testid="collapsedControl"]:hover::after {{
+            border-color: {C["accent"]} !important;
         }}
 
         /* KPI card — no colored top border */
