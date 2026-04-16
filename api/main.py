@@ -264,6 +264,10 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
     if raw.get("mc_number") is None:
         raw["mc_number"] = "UNKNOWN"
 
+    # carrier_name must always be a non-empty string for logging purposes
+    if not raw.get("carrier_name"):
+        raw["carrier_name"] = "Unknown Carrier"
+
     # Convert numeric strings to proper types
     for field in ["initial_rate_offered", "final_agreed_rate"]:
         if field in raw and isinstance(raw[field], str) and raw[field]:
