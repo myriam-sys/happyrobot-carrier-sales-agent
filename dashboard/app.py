@@ -343,6 +343,123 @@ _orange = C["orange"]
 _red    = C["red"]
 
 # ---------------------------------------------------------------------------
+# Insights helper
+# ---------------------------------------------------------------------------
+
+def generate_insights(metrics: dict, call_logs: list[dict]) -> list[dict]:
+    """
+    Generate 3-5 actionable business insights from metrics data.
+    Returns a list of dicts with keys: icon, title, body, color
+    where color is one of: green, orange, red, neutral
+    """
+    insights = []
+
+    total = metrics.get("total_calls", 0)
+    if total == 0:
+        return []
+
+    booked = metrics.get("outcome_breakdown", {}).get("booked", 0)
+    neg_failed = metrics.get("outcome_breakdown", {}).get("negotiation_failed", 0)
+    no_match = metrics.get("outcome_breakdown", {}).get("no_match", 0)
+    carrier_ineligible = metrics.get("outcome_breakdown", {}).get("carrier_ineligible", 0)
+    booking_rate = (booked / total * 100) if total else 0
+    avg_final = metrics.get("avg_final_rate_usd")
+    avg_initial = metrics.get("avg_initial_rate_usd")
+    top_lanes = metrics.get("top_lanes", [])
+    avg_rounds = metrics.get("avg_negotiation_rounds", 0)
+    sentiment_agreement = metrics.get("sentiment_agreement_rate")
+
+    # Insight 1 — Booking rate vs industry benchmark
+    if booking_rate >= 45:
+        insights.append({
+            "icon": "↑",
+            "title": "Strong booking rate",
+            "body": f"Your booking rate of {booking_rate:.1f}% exceeds the freight brokerage industry benchmark of 35–40%. The agent's negotiation strategy is working.",
+            "color": "green"
+        })
+    elif booking_rate >= 30:
+        insights.append({
+            "icon": "→",
+            "title": "Booking rate within range",
+            "body": f"Your booking rate of {booking_rate:.1f}% is near the industry benchmark of 35–40%. Consider reviewing floor price settings on low-converting lanes.",
+            "color": "orange"
+        })
+    else:
+        insights.append({
+            "icon": "↓",
+            "title": "Booking rate below benchmark",
+            "body": f"Your booking rate of {booking_rate:.1f}% is below the 35–40% industry benchmark. Review negotiation floor prices — they may be set too high for current market rates.",
+            "color": "red"
+        })
+
+    # Insight 2 — Negotiation failed rate
+    if total > 0 and neg_failed / total > 0.25:
+        insights.append({
+            "icon": "⚠",
+            "title": "High negotiation failure rate",
+            "body": f"{neg_failed} of {total} calls ({neg_failed/total*100:.0f}%) ended without a deal. This suggests the floor price may be misaligned with carrier expectations — consider adjusting by 5–10%.",
+            "color": "red"
+        })
+
+    # Insight 3 — Top lane opportunity
+    if top_lanes:
+        top = top_lanes[0]
+        top_rate = (top["booked_count"] / top["call_count"] * 100) if top["call_count"] else 0
+        insights.append({
+            "icon": "★",
+            "title": f"Priority lane: {top['origin']} → {top['destination']}",
+            "body": f"This lane has the highest call volume ({top['call_count']} calls, {top_rate:.0f}% booking rate). Prioritize load availability on this lane to maximize revenue.",
+            "color": "green" if top_rate >= 50 else "orange"
+        })
+
+    # Insight 4 — No match rate (load coverage gap)
+    if total > 0 and no_match / total > 0.20:
+        insights.append({
+            "icon": "○",
+            "title": "Load coverage gap detected",
+            "body": f"{no_match} calls ({no_match/total*100:.0f}%) found no matching load. Expanding load coverage on high-demand equipment types and origins would directly increase bookable opportunities.",
+            "color": "orange"
+        })
+
+    # Insight 5 — Rate compression
+    if avg_final and avg_initial and avg_initial > 0:
+        compression = (avg_initial - avg_final) / avg_initial * 100
+        if compression > 8:
+            insights.append({
+                "icon": "$",
+                "title": "Rate compression above threshold",
+                "body": f"Average rate dropped {compression:.1f}% from initial offer (${avg_initial:,.0f} → ${avg_final:,.0f}). Tightening negotiation rounds or raising opening rates could improve margin.",
+                "color": "orange"
+            })
+        elif compression <= 5:
+            insights.append({
+                "icon": "$",
+                "title": "Healthy rate discipline",
+                "body": f"Average rate compression is {compression:.1f}% (${avg_initial:,.0f} → ${avg_final:,.0f}). The agent is holding rates close to the opening offer.",
+                "color": "green"
+            })
+
+    # Insight 6 — Sentiment agreement (AI quality)
+    if sentiment_agreement is not None:
+        if sentiment_agreement >= 80:
+            insights.append({
+                "icon": "✓",
+                "title": "AI sentiment validation reliable",
+                "body": f"Agent and AI Classify agree on sentiment {sentiment_agreement:.0f}% of the time. The agent's self-assessment is trustworthy — no recalibration needed.",
+                "color": "green"
+            })
+        elif sentiment_agreement < 60:
+            insights.append({
+                "icon": "!",
+                "title": "Sentiment assessment divergence",
+                "body": f"Agent and AI Classify only agree {sentiment_agreement:.0f}% of the time. The agent may be misreading caller tone — review prompting for sentiment evaluation.",
+                "color": "red"
+            })
+
+    return insights[:4]  # Cap at 4 insights max
+
+
+# ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
 
@@ -608,6 +725,55 @@ with ai_right:
             "</div>",
             unsafe_allow_html=True,
         )
+
+# ---------------------------------------------------------------------------
+# Insights & Recommendations
+# ---------------------------------------------------------------------------
+
+st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
+st.markdown(
+    "<p class='section-label'>Insights &amp; Recommendations</p>",
+    unsafe_allow_html=True,
+)
+
+insights = generate_insights(metrics, call_logs)
+
+if insights:
+    color_map = {
+        "green":   (C["green"],  "#EDF7F2"),
+        "orange":  (C["orange"], "#FEF0E6"),
+        "red":     (C["red"],    "#FDECEA"),
+        "neutral": (C["muted"],  "#F5F5F5"),
+    }
+
+    for i in range(0, len(insights), 2):
+        cols = st.columns(2)
+        for j, col in enumerate(cols):
+            if i + j < len(insights):
+                ins = insights[i + j]
+                fg, bg = color_map.get(ins["color"], color_map["neutral"])
+                col.markdown(
+                    f"<div style='background:{_white};border:1px solid {_border};"
+                    f"border-left:3px solid {fg};"
+                    f"border-radius:8px;padding:18px 20px;height:100%'>"
+                    f"  <div style='display:flex;align-items:center;gap:8px;margin-bottom:8px'>"
+                    f"    <span style='font-size:16px;color:{fg};font-weight:700'>{ins['icon']}</span>"
+                    f"    <span style='font-size:13px;font-weight:600;color:{_text}'>{ins['title']}</span>"
+                    f"  </div>"
+                    f"  <p style='font-size:13px;color:{_muted};margin:0;line-height:1.55'>{ins['body']}</p>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+else:
+    st.markdown(
+        f"<div style='background:{_white};border:1px solid {_border};"
+        f"border-radius:8px;padding:20px 16px;font-size:13px;color:{_muted}'>"
+        "No insights yet. Insights appear automatically as call data accumulates."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Call log table
