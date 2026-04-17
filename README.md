@@ -74,7 +74,7 @@ Post-call enrichment loop (async, same workflow):
 |---|---|
 | API | https://happyrobot-carrier-sales-agent-production.up.railway.app |
 | Interactive API Docs | https://happyrobot-carrier-sales-agent-production.up.railway.app/docs |
-| Dashboard | https://happyrobot-carrier-sales-agent-dashboard.streamlit.app/*(deploy separately — see Docker / Railway sections below)* |
+| Dashboard | https://happyrobot-carrier-sales-agent-dashboard.streamlit.app/ |
 | HappyRobot Workflow | https://platform.happyrobot.ai/fdemyriamrahali/workflows/sy9u89medca5/editor/oxzei14r8anz |
 
 ---
@@ -86,7 +86,7 @@ Post-call enrichment loop (async, same workflow):
 | API framework | FastAPI | Async-native, automatic OpenAPI docs, fast to iterate |
 | Database | SQLite + SQLAlchemy | Zero-config persistence; swap connection string for Postgres in production |
 | Validation | Pydantic v2 | Strict typing with field-level coercion for HappyRobot's variable payloads |
-| FMCSA integration | httpx (async) | Non-blocking carrier verification with graceful mock fallback |
+| FMCSA integration | httpx + US residential proxy | Real carrier verification from any region; graceful mock fallback when proxy is unavailable |
 | Dashboard | Streamlit + Plotly | Rapid ops UI without a separate frontend build pipeline |
 | Deployment | Railway / Docker | Single-command deploys; Nixpacks auto-detects Python |
 
@@ -204,6 +204,7 @@ All endpoints except `/health` require an
 |---|---|---|---|
 | `API_KEY` | Yes | — | Secret key sent in the `X-API-Key` header by HappyRobot |
 | `FMCSA_API_KEY` | No | — | FMCSA Query Central web key. Without it, all carrier lookups return a stub response with `is_eligible: false` |
+| `FMCSA_PROXY` | No | — | HTTP/HTTPS proxy URL for FMCSA requests (e.g. `http://user:pass@host:port`). Use a US proxy to bypass FMCSA geo-restriction |
 | `DATABASE_URL` | No | `sqlite:///./data/carrier_sales.db` | SQLAlchemy connection string. Change to a Postgres URL for production scale |
 
 ---
@@ -241,12 +242,12 @@ happyrobot-carrier-sales-agent/
 ## Known Limitations
 
 **FMCSA API geo-restriction.** The FMCSA Query Central API blocks requests from
-non-US IP addresses. Deployments on European cloud infrastructure (including Railway's
-EU regions) will receive 403 responses. The client handles this gracefully: on a 403 or
-404, it falls back to a deterministic mock response derived from the MC number's last
-digit (odd = eligible, even = ineligible). Affected responses include `"is_mock": true`
-in the payload. Use Railway's US region or proxy through a US-based endpoint to get live
-FMCSA data.
+non-US IP addresses. This is handled transparently via the `FMCSA_PROXY` environment
+variable — all FMCSA requests are routed through a US residential proxy so real carrier
+data is accessible regardless of deployment region. If the proxy is not configured or
+a carrier is not found (404), the API falls back to a deterministic mock response derived
+from the MC number's last digit (odd = eligible, even = ineligible), with `"is_mock": true`
+and a `fmcsa_error` explanation in the payload.
 
 **SQLite is not production-scale.** SQLite handles the throughput of this demo
 comfortably, but it does not support concurrent writes from multiple API workers. For
@@ -261,47 +262,39 @@ Call log history is lost unless you attach a persistent volume or migrate to Pos
 
 ## Testing Guide
 
-### Mock MC Numbers
+### Real FMCSA MC Numbers
 
-The FMCSA Query Central API is geo-restricted to US IP addresses.
-Requests from European infrastructure (including Railway EU regions)
-receive a 403 response. When this occurs, the API falls back to a
-deterministic mock response and includes a `fmcsa_error` field in
-the response explaining the situation.
+The API integrates with FMCSA Query Central via a US proxy,
+enabling real carrier verification from any location.
 
-To test the full call flow regardless of FMCSA availability, use
-these mock MC numbers:
+These MC numbers are confirmed active in FMCSA records:
 
-| MC Number | Carrier Name | Eligible | Use Case |
+| MC Number | Carrier Name | State | Status |
 |---|---|---|---|
-| 11111 | FastFreight Carriers LLC | Yes | Standard booking flow |
-| 33333 | PrimeHaul Transport | Yes | Negotiation testing |
-| 55555 | Midwest Freight Co | Yes | No-match testing (use Reefer + Houston) |
-| 22222 | Suspended Transport Inc | No | Ineligible carrier flow |
-| 44444 | Revoked Carriers LLC | No | Ineligible carrier flow |
+| 21544 | N D Gallagher Clay Products Corp | TX | Eligible |
+| 107048 | Oppenheimer Harry L | CT | Eligible |
+| 25820 | Desilvia Bella Ann | MA | Eligible |
+| 15735 | Joseph H Graves | FL | Eligible |
+| 362368 | Triple J Land & Water Construction | SC | Eligible |
+| 281929 | Poor Boy Logging | OR | Eligible |
 
-When a mock response is returned, the API includes `"is_mock": true`
-in the payload. The `fmcsa_error` field contains a human-readable
-explanation of why the real FMCSA data was unavailable.
-
-### Verifying FMCSA Connectivity
-
-Use the diagnostic endpoint to check FMCSA status:
-
-```bash
-curl -X GET \
-  "https://your-api-url/debug/verify/11111" \
-  -H "X-API-Key: your-api-key"
-```
-
-If `fmcsa_error` is null in the response, FMCSA is reachable and
-returning real data. If `fmcsa_error` is present, the mock fallback
-is active.
+For ineligible carrier testing (FMCSA returns no content for
+inactive carriers), use MC 22222 which triggers the mock
+ineligible response.
 
 ### Recommended Test Scenarios
 
-1. **Eligible carrier + matching load**: MC 11111, Dry Van, Chicago
-2. **Eligible carrier + no match**: MC 11111, Reefer, Houston
-3. **Ineligible carrier**: MC 22222, any equipment
-4. **Negotiation to deal**: MC 11111, Dry Van, Chicago — counter below $2,300
-5. **Negotiation failed**: MC 11111, Dry Van, Chicago — reject floor of $2,070
+1. **Eligible carrier + matching load**: MC 21544, Dry Van, Chicago
+2. **Eligible carrier + no match**: MC 15735, Reefer, Houston
+3. **Ineligible carrier**: MC 22222
+4. **Negotiation to deal**: MC 107048, Dry Van, Chicago — counter below $2,300
+5. **Negotiation failed**: MC 362368, Dry Van, Chicago — reject floor of $2,070
+
+### Architecture Note
+
+FMCSA Query Central is geo-restricted to US IP addresses. This API
+routes all FMCSA requests through a US residential proxy
+(FMCSA_PROXY env var), ensuring real carrier data is accessible
+regardless of where the API is deployed. Carlos and any reviewer
+can call the API from anywhere — the proxy handles the US routing
+transparently.
