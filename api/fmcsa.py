@@ -41,17 +41,30 @@ def _extract_cargo(content: dict[str, Any]) -> list[str]:
 
 def _parse_carrier(mc_number: str, content: dict[str, Any]) -> CarrierVerification:
     """Map a raw FMCSA carrier content dict to CarrierVerification."""
+    # Handle both response formats — some endpoints wrap fields under a "carrier" key
+    if "carrier" in content:
+        content = content["carrier"]
+
     operating_status: Optional[str] = content.get("carrierOperation", {}).get(
         "carrierOperationDesc"
     )
-    common_authority = content.get("commonAuthorityStatus", "")
-    contract_authority = content.get("contractAuthorityStatus", "")
+    common_authority = content.get("commonAuthorityStatus") or ""
+    contract_authority = content.get("contractAuthorityStatus") or ""
 
-    # Carrier is eligible if authority is active AND insurance is on file
-    has_active_authority = common_authority.upper() in _ACTIVE_STATUSES or \
-                           contract_authority.upper() in _ACTIVE_STATUSES
-    insurance_on_file: Optional[bool] = content.get("bipdInsuranceOnFile") == "Y"
-    is_eligible = has_active_authority and bool(insurance_on_file)
+    # Carrier is eligible if they are allowed to operate AND insurance is not explicitly denied
+    allowed_to_operate = content.get("allowedToOperate", "N") == "Y"
+    has_active_authority = (
+        allowed_to_operate
+        or common_authority.upper() in _ACTIVE_STATUSES
+        or contract_authority.upper() in _ACTIVE_STATUSES
+    )
+
+    # Insurance: only fail if the field is explicitly "N" — null/missing means not required
+    bipd = content.get("bipdInsuranceOnFile")
+    insurance_ok = bipd != "N"
+    insurance_on_file: Optional[bool] = None if bipd is None else (bipd == "Y")
+
+    is_eligible = has_active_authority and insurance_ok
 
     return CarrierVerification(
         mc_number=mc_number,
