@@ -137,10 +137,6 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
         Re-raised for non-404/403 HTTP errors (e.g. 500) so callers can decide
         how to handle them.
     """
-    if mc_number.strip() in ("11111", "22222", "33333", "44444", "55555"):
-        logger.warning("DEBUG: returning hardcoded mock for test MC %s", mc_number)
-        return _mock_carrier(mc_number, fmcsa_error="Test MC number — mock response")
-
     if mock:
         logger.warning("FMCSA mock mode active for MC %s (explicit ?mock=true)", mc_number)
         return _mock_carrier(mc_number)
