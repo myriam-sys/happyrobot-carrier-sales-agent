@@ -25,6 +25,7 @@ load_dotenv()
 
 FMCSA_BASE_URL = "https://mobile.fmcsa.dot.gov/qc/services/carriers"
 FMCSA_API_KEY: str = os.getenv("FMCSA_API_KEY", "")
+FMCSA_PROXY: str = os.getenv("FMCSA_PROXY", "")
 
 # Statuses that indicate the carrier is authorised to haul freight
 _ACTIVE_STATUSES = {"ACTIVE", "AUTHORIZED FOR PROPERTY"}
@@ -69,10 +70,10 @@ def _parse_carrier(mc_number: str, content: dict[str, Any]) -> CarrierVerificati
 
 
 _FMCSA_403_ERROR = (
-    "FMCSA API returned 403 — endpoint is geo-restricted outside the US or the API key "
-    "is invalid. Real carrier data unavailable. Using mock response based on MC number "
-    "parity. To test with real FMCSA data, deploy to a US region with a valid FMCSA "
-    "Query Central key. Mock MC numbers available: 11111 (eligible), 33333 (eligible), "
+    "FMCSA API returned 403 — the API key is invalid or the request was rejected. "
+    "Real carrier data unavailable. Using mock response based on MC number parity. "
+    "Ensure FMCSA_API_KEY is set to a valid FMCSA Query Central key. "
+    "Mock MC numbers available: 11111 (eligible), 33333 (eligible), "
     "55555 (eligible), 22222 (ineligible), 44444 (ineligible)."
 )
 
@@ -125,8 +126,8 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
     Returns
     -------
     CarrierVerification | None
-        Parsed carrier record. On 404 (MC not found) or 403 (geo-restricted /
-        invalid key), returns a mock record with ``is_mock=True`` and
+        Parsed carrier record. On 404 (MC not found) or 403 (invalid key /
+        rejected), returns a mock record with ``is_mock=True`` and
         ``fmcsa_error`` set to a descriptive message. Returns ``None`` only
         when ``mc_number`` is empty or contains no digits.
 
@@ -163,7 +164,11 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
     url = f"{FMCSA_BASE_URL}/{numeric_mc}"
     params = {"webKey": FMCSA_API_KEY}
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    proxy_url = FMCSA_PROXY if FMCSA_PROXY else None
+    async with httpx.AsyncClient(
+        timeout=10.0,
+        proxy=proxy_url,
+    ) as client:
         response = await client.get(url, params=params)
 
     if response.status_code == 404:
@@ -172,7 +177,7 @@ async def lookup_carrier(mc_number: str, mock: bool = False) -> Optional[Carrier
 
     if response.status_code == 403:
         logger.warning(
-            "FMCSA returned 403 for MC %s — geo-restricted or invalid key", mc_number
+            "FMCSA returned 403 for MC %s — invalid key or request rejected", mc_number
         )
         return _mock_carrier(mc_number, fmcsa_error=_FMCSA_403_ERROR)
 
