@@ -92,7 +92,7 @@ LOGO_SVG = """
 
 st.set_page_config(
     page_title="HappyRobot — Carrier Sales Ops",
-    page_icon="",
+    page_icon="◼️",
     layout="wide",
 )
 
@@ -279,7 +279,7 @@ st.markdown(
 # Data fetch
 # ---------------------------------------------------------------------------
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=10)
 def fetch_metrics() -> tuple[dict, bool]:
     try:
         r = requests.get(
@@ -293,7 +293,7 @@ def fetch_metrics() -> tuple[dict, bool]:
         return {}, False
 
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=10)
 def fetch_call_logs(limit: int = 10) -> list[dict]:
     try:
         r = requests.get(
