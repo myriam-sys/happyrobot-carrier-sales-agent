@@ -476,6 +476,33 @@ with st.sidebar:
         st.rerun()
 
     st.markdown(
+        "<div style='margin-top:12px'></div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("⚠ Admin"):
+        st.markdown(
+            f"<p style='font-size:12px;color:{C['muted']}'>Clear all call logs for a fresh demo run.</p>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Clear call logs", use_container_width=True):
+            try:
+                r = requests.delete(
+                    f"{API_BASE_URL}/admin/clear-calls",
+                    headers={"X-API-Key": API_KEY},
+                    timeout=8,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    st.success(f"Cleared {data['deleted']} call log(s).")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error(f"Failed: {r.status_code}")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    st.markdown(
         f"<p style='font-size:12px;color:{C['muted']};margin-top:10px'>Updated: {now_str}</p>",
         unsafe_allow_html=True,
     )

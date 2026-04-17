@@ -473,3 +473,20 @@ def dashboard_metrics(db: Session = Depends(get_db)):
         sentiment_agreement_rate=sentiment_agreement_rate,
         recent_summaries=recent_summaries,
     )
+
+
+@app.delete(
+    "/admin/clear-calls",
+    tags=["Admin"],
+    summary="Clear all call logs — demo reset only",
+    dependencies=[Depends(require_api_key)],
+)
+def clear_all_calls(db: Session = Depends(get_db)):
+    """
+    Delete every call log record from the database.
+    Intended for demo resets only — this action is irreversible.
+    Requires API key authentication via X-API-Key header.
+    """
+    deleted = db.query(CallLogORM).delete()
+    db.commit()
+    return {"deleted": deleted, "message": f"Cleared {deleted} call log(s)."}
