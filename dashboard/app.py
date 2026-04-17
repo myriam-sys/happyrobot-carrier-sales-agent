@@ -127,43 +127,6 @@ st.markdown(
             border-bottom: none !important;
         }}
 
-        /* Style the sidebar collapse/expand toggle as a clean arrow */
-        [data-testid="collapsedControl"] {{
-            background: {C["white"]} !important;
-            border: 1px solid {C["border"]} !important;
-            border-radius: 50% !important;
-            width: 28px !important;
-            height: 28px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-shadow: none !important;
-            overflow: hidden !important;
-        }}
-        [data-testid="collapsedControl"]:hover {{
-            border-color: {C["accent"]} !important;
-            background: {C["bg"]} !important;
-        }}
-        /* Hide the raw Material Icon text (keyboard_double_arrow_*) */
-        [data-testid="collapsedControl"] span,
-        [data-testid="collapsedControl"] svg {{
-            display: none !important;
-        }}
-        /* Inject a clean chevron via pseudo-element */
-        [data-testid="collapsedControl"]::after {{
-            content: "" !important;
-            display: block !important;
-            width: 10px !important;
-            height: 10px !important;
-            border-top: 2px solid {C["muted"]} !important;
-            border-right: 2px solid {C["muted"]} !important;
-            transform: rotate(225deg) !important;
-            margin-left: 2px !important;
-        }}
-        [data-testid="collapsedControl"]:hover::after {{
-            border-color: {C["accent"]} !important;
-        }}
-
         /* KPI card — no colored top border */
         .kpi-card {{
             background: {C["white"]};
@@ -480,7 +443,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    with st.expander("⚠ Admin"):
+    with st.expander("Admin"):
         st.markdown(
             f"<p style='font-size:12px;color:{C['muted']}'>Clear all call logs for a fresh demo run.</p>",
             unsafe_allow_html=True,
