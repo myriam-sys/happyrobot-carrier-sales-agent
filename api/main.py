@@ -255,38 +255,45 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
     """
     raw = await request.json()
 
-    # Convert empty strings to None for optional fields (and mc_number if blank)
-    for field in ["load_id", "final_agreed_rate", "notes", "mc_number"]:
-        if field in raw and raw[field] == "":
-            raw[field] = None
+    try:
+        # Robust sanitization — handles None, empty string, wrong types
+        def _clean(val, default=None):
+            if val is None or val == "" or val == "null":
+                return default
+            return val
 
-    # mc_number must always be a non-None string for logging purposes
-    if raw.get("mc_number") is None:
-        raw["mc_number"] = "UNKNOWN"
+        raw["mc_number"] = str(_clean(raw.get("mc_number"), "UNKNOWN"))
+        raw["carrier_name"] = _clean(raw.get("carrier_name"), "Unknown Carrier") or "Unknown Carrier"
+        raw["load_id"] = _clean(raw.get("load_id"))
+        raw["notes"] = _clean(raw.get("notes"))
 
-    # carrier_name must always be a non-empty string for logging purposes
-    if not raw.get("carrier_name"):
-        raw["carrier_name"] = "Unknown Carrier"
+        for field in ["initial_rate_offered"]:
+            v = _clean(raw.get(field), 0.0)
+            raw[field] = float(v) if v is not None else 0.0
 
-    # Convert numeric strings to proper types
-    for field in ["initial_rate_offered", "final_agreed_rate"]:
-        if field in raw and isinstance(raw[field], str) and raw[field]:
-            raw[field] = float(raw[field])
+        raw["final_agreed_rate"] = None if _clean(raw.get("final_agreed_rate")) is None else float(raw["final_agreed_rate"])
 
-    for field in ["num_negotiation_rounds", "call_duration_seconds"]:
-        if field in raw and isinstance(raw[field], str) and raw[field]:
-            raw[field] = int(raw[field])
+        for field in ["num_negotiation_rounds", "call_duration_seconds"]:
+            v = _clean(raw.get(field), 0)
+            raw[field] = int(float(str(v))) if v is not None else 0
 
-    payload = CallLogCreate(**raw)
-    row = CallLogORM(
-        call_id=str(uuid.uuid4()),
-        timestamp=datetime.utcnow(),
-        **payload.model_dump(),
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return _orm_to_call(row)
+        payload = CallLogCreate(**raw)
+        row = CallLogORM(
+            call_id=str(uuid.uuid4()),
+            timestamp=datetime.utcnow(),
+            **payload.model_dump(),
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        return _orm_to_call(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Validation error: {str(e)} | Raw payload: {raw}",
+        )
 
 
 @app.post(
