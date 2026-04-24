@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -188,3 +188,16 @@ class DashboardMetrics(BaseModel):
     # AI quality layer
     sentiment_agreement_rate: Optional[float] = None  # % where agent sentiment == ai_sentiment
     recent_summaries: list[str] = []                  # last 5 negotiation_summary values
+
+
+class CarrierHistory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    mc_number: str
+    returning_carrier: bool
+    last_call_date: Optional[datetime] = None
+    last_load_id: Optional[str] = None
+    last_origin: Optional[str] = None
+    last_destination: Optional[str] = None
+    total_calls: int = 0
+    total_booked: int = 0

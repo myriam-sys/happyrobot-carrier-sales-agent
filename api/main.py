@@ -30,6 +30,7 @@ from api.models import (
     CallEnrichment,
     CallLog,
     CallLogCreate,
+    CarrierHistory,
     CarrierVerification,
     DashboardMetrics,
     Load,
@@ -235,6 +236,65 @@ async def debug_verify(
         }
     except Exception as e:
         return {"success": False, "mock": mock, "error": str(e)}
+
+
+@app.get(
+    "/carriers/{mc_number}/history",
+    response_model=CarrierHistory,
+    tags=["Carriers"],
+    summary="Get call history for a carrier by MC number",
+    dependencies=[Depends(require_api_key)],
+)
+def get_carrier_history(
+    mc_number: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns aggregated call history for a given MC number,
+    computed from existing call logs.
+
+    Used by the Orchestrator Agent to detect returning carriers
+    and personalize the greeting.
+
+    Returns returning_carrier=False with zero counts if no
+    prior calls exist for this MC number.
+    """
+    rows = (
+        db.query(CallLogORM)
+        .filter(CallLogORM.mc_number == mc_number)
+        .order_by(CallLogORM.timestamp.desc())
+        .all()
+    )
+
+    if not rows:
+        return CarrierHistory(
+            mc_number=mc_number,
+            returning_carrier=False,
+        )
+
+    last = rows[0]
+
+    # Resolve last load's origin and destination from the loads table
+    last_origin: Optional[str] = None
+    last_destination: Optional[str] = None
+    if last.load_id:
+        load_row = db.get(LoadORM, last.load_id)
+        if load_row:
+            last_origin = load_row.origin
+            last_destination = load_row.destination
+
+    total_booked = sum(1 for r in rows if r.outcome == "booked")
+
+    return CarrierHistory(
+        mc_number=mc_number,
+        returning_carrier=True,
+        last_call_date=last.timestamp,
+        last_load_id=last.load_id,
+        last_origin=last_origin,
+        last_destination=last_destination,
+        total_calls=len(rows),
+        total_booked=total_booked,
+    )
 
 
 @app.post(
