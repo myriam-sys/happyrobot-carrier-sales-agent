@@ -99,7 +99,10 @@ def require_api_key(key: str = Security(_api_key_header)) -> str:
 # ---------------------------------------------------------------------------
 
 def _orm_to_load(row: LoadORM) -> Load:
-    return Load.model_validate(row)
+    load = Load.model_validate(row)
+    if load.rate_usd is not None:
+        load.floor_price = round(load.rate_usd * 0.90, 2)
+    return load
 
 
 def _orm_to_call(row: CallLogORM) -> CallLog:

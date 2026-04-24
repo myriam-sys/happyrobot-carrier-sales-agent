@@ -3,7 +3,8 @@
     "allow": [
       "Bash(venv/Scripts/pip install *)",
       "Bash(cp .env.example .env)",
-      "Bash(echo \"API_KEY=test-key-local\")"
+      "Bash(echo \"API_KEY=test-key-local\")",
+      "Bash(python -c ' *)"
     ]
   }
 }

@@ -49,6 +49,7 @@ class LoadBase(BaseModel):
     weight_lbs: int = Field(..., gt=0, le=48000, examples=[42000])
     miles: int = Field(..., gt=0, examples=[920])
     rate_usd: float = Field(..., gt=0, examples=[2450.00])
+    floor_price: Optional[float] = None
     commodity: str = Field(..., examples=["Frozen Foods"])
     pickup_date: datetime
     delivery_date: datetime
