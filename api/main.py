@@ -10,6 +10,7 @@ Exposes endpoints for the AI voice agent to:
 
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from collections import defaultdict
@@ -20,6 +21,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -41,6 +43,8 @@ from api.models import (
 )
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -315,10 +319,14 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
 
     Accepts the raw request body so that empty strings sent by HappyRobot for
     optional fields can be coerced to ``None`` before Pydantic validation.
+    
+    CRITICAL: This endpoint ALWAYS returns HTTP 200 to keep HappyRobot workflows
+    alive. Errors are logged and returned as success responses with error details.
     """
-    raw = await request.json()
-
+    raw = {}
     try:
+        raw = await request.json()
+
         # Robust sanitization — handles None, empty string, wrong types
         def _clean(val, default=None):
             if val is None or val == "" or val == "null":
@@ -326,7 +334,10 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
             return val
 
         raw["mc_number"] = str(_clean(raw.get("mc_number"), "UNKNOWN"))
-        raw["carrier_name"] = _clean(raw.get("carrier_name"), "Unknown Carrier") or "Unknown Carrier"
+        raw["carrier_name"] = (
+            _clean(raw.get("carrier_name"), "Unknown Carrier")
+            or "Unknown Carrier"
+        )
         raw["load_id"] = _clean(raw.get("load_id"))
         raw["notes"] = _clean(raw.get("notes"))
 
@@ -334,7 +345,11 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
             v = _clean(raw.get(field), 0.0)
             raw[field] = float(v) if v is not None else 0.0
 
-        raw["final_agreed_rate"] = None if _clean(raw.get("final_agreed_rate")) is None else float(raw["final_agreed_rate"])
+        raw["final_agreed_rate"] = (
+            None
+            if _clean(raw.get("final_agreed_rate")) is None
+            else float(raw["final_agreed_rate"])
+        )
 
         for field in ["num_negotiation_rounds", "call_duration_seconds"]:
             v = _clean(raw.get(field), 0)
@@ -350,12 +365,23 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(row)
         return _orm_to_call(row)
-    except HTTPException:
-        raise
+
     except Exception as e:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Validation error: {str(e)} | Raw payload: {raw}",
+        # Log the failure but ALWAYS return 200 so HappyRobot
+        # continues to the next node (AI Extract, AI Classify, Enrich)
+        logger.error(
+            "log_call failed — returning 200 to keep workflow alive. "
+            "Error: %s | Raw payload: %s",
+            str(e),
+            raw,
+        )
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "error",
+                "detail": str(e),
+                "raw": raw,
+            },
         )
 
 
