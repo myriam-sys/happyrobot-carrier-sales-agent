@@ -304,7 +304,7 @@ def get_carrier_history(
 @app.post(
     "/calls/log",
     response_model=CallLog,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
     tags=["Calls"],
     summary="Log a completed carrier call",
     dependencies=[Depends(require_api_key)],

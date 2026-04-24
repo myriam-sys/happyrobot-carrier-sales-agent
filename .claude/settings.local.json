@@ -4,7 +4,10 @@
       "Bash(venv/Scripts/pip install *)",
       "Bash(cp .env.example .env)",
       "Bash(echo \"API_KEY=test-key-local\")",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(curl -s -o /tmp/log_good.json -w '%{http_code}' -X POST -H 'X-API-Key: test-key-local' -H 'Content-Type: application/json' -d '{ *)",
+      "Read(//tmp/**)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('call_id:', d.get\\('call_id'\\), '| outcome:', d.get\\('outcome'\\)\\)\")"
     ]
   }
 }
