@@ -35,6 +35,8 @@ from api.models import (
     CarrierHistory,
     CarrierVerification,
     DashboardMetrics,
+    EvaluateOfferRequest,
+    EvaluateOfferResponse,
     Load,
     LoadSearchResult,
     OutcomeBreakdown,
@@ -298,6 +300,123 @@ def get_carrier_history(
         last_destination=last_destination,
         total_calls=len(rows),
         total_booked=total_booked,
+    )
+
+
+@app.post(
+    "/evaluate-offer",
+    response_model=EvaluateOfferResponse,
+    tags=["Negotiation"],
+    summary="Evaluate a carrier counter-offer and return negotiation decision",
+    dependencies=[Depends(require_api_key)],
+)
+def evaluate_offer(
+    payload: EvaluateOfferRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Deterministic negotiation engine called mid-conversation.
+
+    Retrieves the load's rate_usd from the DB, calculates
+    floor_price = rate_usd * 0.90, and applies round-specific
+    logic to return accept / counter / reject with an exact
+    phrase for the agent to speak.
+
+    Round logic:
+    - Round 1: always counter between current offer and
+      carrier offer (or between rate and floor if below floor)
+    - Round 2: accept if >= floor, else counter at floor
+    - Round 3: accept if >= floor, else reject
+    """
+    load_row = db.get(LoadORM, payload.load_id)
+    if load_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Load '{payload.load_id}' not found.",
+        )
+
+    rate_usd = float(load_row.rate_usd)
+    floor_price = round(rate_usd * 0.90, 2)
+    carrier_offer = round(payload.carrier_offer, 2)
+    round_number = payload.round_number
+
+    if round_number < 1:
+        round_number = 1
+    if round_number > 3:
+        round_number = 3
+
+    decision: str
+    suggested_counter: Optional[float] = None
+    message: str
+
+    if round_number == 1:
+        if carrier_offer >= rate_usd:
+            decision = "accept"
+            suggested_counter = None
+            message = (
+                f"Absolutely, ${carrier_offer:,.0f} works for me — let's do it!"
+            )
+        elif carrier_offer >= floor_price:
+            counter = round(
+                max(floor_price, (rate_usd + carrier_offer) / 2), 2
+            )
+            decision = "counter"
+            suggested_counter = counter
+            message = (
+                f"I hear you — let me see what I can do. "
+                f"How about ${counter:,.0f}?"
+            )
+        else:
+            counter = round(
+                max(floor_price, (rate_usd + floor_price) / 2), 2
+            )
+            decision = "counter"
+            suggested_counter = counter
+            message = (
+                f"I can't quite get there, but I can come down "
+                f"to ${counter:,.0f}."
+            )
+
+    elif round_number == 2:
+        if carrier_offer >= floor_price:
+            decision = "accept"
+            suggested_counter = None
+            message = (
+                f"You know what, let's make it work at "
+                f"${carrier_offer:,.0f}! Deal!"
+            )
+        else:
+            decision = "counter"
+            suggested_counter = floor_price
+            message = (
+                f"I really wish I could, but I've come down "
+                f"as far as I can on this one. "
+                f"My best is ${floor_price:,.0f}."
+            )
+
+    else:  # round_number == 3
+        if carrier_offer >= floor_price:
+            decision = "accept"
+            suggested_counter = None
+            message = (
+                f"Alright, ${carrier_offer:,.0f} it is — deal!"
+            )
+        else:
+            decision = "reject"
+            suggested_counter = None
+            message = (
+                f"I've pushed as far as I can — "
+                f"${floor_price:,.0f} is my absolute final. "
+                f"I can't go lower than that."
+            )
+
+    return EvaluateOfferResponse(
+        decision=decision,
+        suggested_counter=suggested_counter,
+        floor_price=floor_price,
+        rate_usd=rate_usd,
+        round_number=round_number,
+        message=message,
     )
 
 

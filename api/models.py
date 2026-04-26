@@ -201,3 +201,18 @@ class CarrierHistory(BaseModel):
     last_destination: Optional[str] = None
     total_calls: int = 0
     total_booked: int = 0
+
+
+class EvaluateOfferRequest(BaseModel):
+    load_id: str
+    carrier_offer: float
+    round_number: int  # 1, 2, or 3
+
+
+class EvaluateOfferResponse(BaseModel):
+    decision: str        # "accept" | "counter" | "reject"
+    suggested_counter: Optional[float] = None
+    floor_price: float
+    rate_usd: float
+    round_number: int
+    message: str         # exact phrase for the agent to say
