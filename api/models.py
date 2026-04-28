@@ -216,3 +216,25 @@ class EvaluateOfferResponse(BaseModel):
     rate_usd: float
     round_number: int
     message: str         # exact phrase for the agent to say
+
+
+class CRMBookingCreate(BaseModel):
+    mc_number: str
+    carrier_name: str
+    load_id: Optional[str] = None
+    final_agreed_rate: Optional[float] = None
+    outcome: str = "booked"
+
+
+class CRMBooking(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    booking_id: str
+    mc_number: str
+    carrier_name: str
+    load_id: Optional[str] = None
+    final_agreed_rate: Optional[float] = None
+    outcome: str
+    created_at: datetime
+    status: str  # "created" | "error"
+    message: str

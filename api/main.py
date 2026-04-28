@@ -26,7 +26,7 @@ from fastapi.security import APIKeyHeader
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from api.database import CallLogORM, LoadORM, create_tables, migrate_tables, engine, get_db
+from api.database import CallLogORM, CRMBookingORM, LoadORM, create_tables, migrate_tables, engine, get_db
 from api.fmcsa import lookup_carrier
 from api.models import (
     CallEnrichment,
@@ -34,6 +34,8 @@ from api.models import (
     CallLogCreate,
     CarrierHistory,
     CarrierVerification,
+    CRMBooking,
+    CRMBookingCreate,
     DashboardMetrics,
     EvaluateOfferRequest,
     EvaluateOfferResponse,
@@ -417,6 +419,62 @@ def evaluate_offer(
         rate_usd=rate_usd,
         round_number=round_number,
         message=message,
+    )
+
+
+@app.post(
+    "/crm/booking",
+    response_model=CRMBooking,
+    status_code=status.HTTP_200_OK,
+    tags=["CRM"],
+    summary="Mock CRM/TMS booking creation",
+    dependencies=[Depends(require_api_key)],
+)
+def create_crm_booking(
+    payload: CRMBookingCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Mock CRM/TMS integration endpoint.
+
+    Called by the HappyRobot workflow when a carrier
+    successfully books a load. Stores the booking record
+    and returns a confirmation.
+
+    In production, replace the DB insert with a real
+    TMS/CRM API call (SAP, McLeod, Salesforce, etc.)
+    """
+    booking = CRMBookingORM(
+        booking_id=str(uuid.uuid4()),
+        mc_number=payload.mc_number,
+        carrier_name=payload.carrier_name,
+        load_id=payload.load_id,
+        final_agreed_rate=payload.final_agreed_rate,
+        outcome=payload.outcome,
+        created_at=datetime.utcnow(),
+        status="created",
+        message=(
+            f"Booking confirmed for {payload.carrier_name} "
+            f"on load {payload.load_id} "
+            f"at ${payload.final_agreed_rate:,.2f}."
+            if payload.final_agreed_rate and payload.load_id
+            else f"Booking confirmed for {payload.carrier_name}."
+        ),
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+
+    return CRMBooking(
+        booking_id=booking.booking_id,
+        mc_number=booking.mc_number,
+        carrier_name=booking.carrier_name,
+        load_id=booking.load_id,
+        final_agreed_rate=booking.final_agreed_rate,
+        outcome=booking.outcome,
+        created_at=booking.created_at,
+        status=booking.status,
+        message=booking.message,
     )
 
 

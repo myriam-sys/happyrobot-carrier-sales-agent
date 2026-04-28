@@ -88,6 +88,20 @@ class CallLogORM(Base):
     ai_confidence = Column(Float, nullable=True)
 
 
+class CRMBookingORM(Base):
+    __tablename__ = "crm_bookings"
+
+    booking_id = Column(String, primary_key=True)
+    mc_number = Column(String, nullable=False)
+    carrier_name = Column(String, nullable=False)
+    load_id = Column(String, nullable=True)
+    final_agreed_rate = Column(Float, nullable=True)
+    outcome = Column(String, default="booked")
+    created_at = Column(DateTime, nullable=False)
+    status = Column(String, default="created")
+    message = Column(String, nullable=True)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
