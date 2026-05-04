@@ -144,6 +144,7 @@ def health_check():
 )
 def list_loads(
     origin: Optional[str] = Query(None, description="Filter by origin city/state substring"),
+    destination: Optional[str] = Query(None, description="Filter by destination city/state substring"),
     equipment_type: Optional[str] = Query(None, description="Filter by equipment type (Dry Van | Reefer | Flatbed)"),
     available_only: bool = Query(True, description="Return only loads that are still available"),
     db: Session = Depends(get_db),
@@ -154,6 +155,7 @@ def list_loads(
     Query parameters
     ----------------
     origin          : Case-insensitive substring match on the origin field.
+    destination     : Case-insensitive substring match on the destination field.
     equipment_type  : Exact match on equipment type (``Dry Van``, ``Reefer``, ``Flatbed``).
     available_only  : When ``true`` (default), only loads not yet covered are returned.
     """
@@ -163,6 +165,8 @@ def list_loads(
         q = q.filter(LoadORM.available == True)  # noqa: E712
     if origin:
         q = q.filter(LoadORM.origin.ilike(f"%{origin}%"))
+    if destination:
+        q = q.filter(LoadORM.destination.ilike(f"%{destination}%"))
     if equipment_type:
         q = q.filter(LoadORM.equipment_type == equipment_type)
 
