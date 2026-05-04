@@ -489,6 +489,93 @@ def create_crm_booking(
     tags=["Calls"],
     summary="Log a completed carrier call",
     dependencies=[Depends(require_api_key)],
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "mc_number": {
+                                "type": "string",
+                                "description": "The carrier MC number",
+                            },
+                            "carrier_name": {
+                                "type": "string",
+                                "description": "Legal name of the carrier",
+                            },
+                            "load_id": {
+                                "type": "string",
+                                "nullable": True,
+                                "description": "Load ID from search result",
+                            },
+                            "equipment_type": {
+                                "type": "string",
+                                "nullable": True,
+                                "description": "Dry Van, Reefer, or Flatbed",
+                            },
+                            "origin": {
+                                "type": "string",
+                                "nullable": True,
+                                "description": "Pickup city or state",
+                            },
+                            "destination": {
+                                "type": "string",
+                                "nullable": True,
+                                "description": "Delivery city or state",
+                            },
+                            "initial_rate_offered": {
+                                "type": "number",
+                                "description": "Loadboard rate in USD. Use 0 if no load.",
+                            },
+                            "final_agreed_rate": {
+                                "type": "number",
+                                "nullable": True,
+                                "description": "Agreed rate if booked, null otherwise",
+                            },
+                            "num_negotiation_rounds": {
+                                "type": "integer",
+                                "description": "Number of price exchanges",
+                            },
+                            "outcome": {
+                                "type": "string",
+                                "enum": [
+                                    "booked",
+                                    "negotiation_failed",
+                                    "carrier_ineligible",
+                                    "no_match",
+                                    "hung_up",
+                                ],
+                                "description": "Call outcome",
+                            },
+                            "sentiment": {
+                                "type": "string",
+                                "enum": [
+                                    "positive",
+                                    "neutral",
+                                    "frustrated",
+                                    "hostile",
+                                ],
+                                "description": "Carrier sentiment during call",
+                            },
+                            "call_duration_seconds": {
+                                "type": "integer",
+                                "nullable": True,
+                                "description": "Call duration in seconds",
+                            },
+                            "notes": {
+                                "type": "string",
+                                "nullable": True,
+                                "description": "Optional notes for the sales team",
+                            },
+                        },
+                        "required": ["mc_number", "carrier_name", "outcome", "sentiment"],
+                    }
+                }
+            },
+        }
+    },
 )
 async def log_call(request: Request, db: Session = Depends(get_db)):
     """
