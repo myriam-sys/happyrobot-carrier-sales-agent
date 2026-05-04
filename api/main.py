@@ -692,6 +692,8 @@ def enrich_call(payload: CallEnrichment, db: Session = Depends(get_db)):
         row.load_id = payload.extracted_load_id
     if payload.extracted_outcome and not row.outcome:
         row.outcome = payload.extracted_outcome
+    if payload.call_duration_seconds is not None:
+        row.call_duration_seconds = payload.call_duration_seconds
 
     db.commit()
     db.refresh(row)

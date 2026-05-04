@@ -124,6 +124,7 @@ class CallEnrichment(BaseModel):
     negotiation_summary: str = Field(..., description="One-sentence AI Extract summary of the negotiation")
     ai_sentiment: str = Field(..., description="AI Classify output: positive / neutral / frustrated / hostile")
     ai_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Classifier confidence score (0–1)")
+    call_duration_seconds: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------
