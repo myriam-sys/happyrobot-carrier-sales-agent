@@ -81,6 +81,9 @@ class CallLogCreate(BaseModel):
     mc_number: str = Field(..., examples=["MC-123456"])
     carrier_name: str = Field(..., examples=["Swift Transport LLC"])
     load_id: Optional[str] = Field(None, examples=["LD-001"])
+    equipment_type: Optional[str] = None
+    origin: Optional[str] = None
+    destination: Optional[str] = None
     initial_rate_offered: float = Field(..., gt=0, examples=[2200.00])
     final_agreed_rate: Optional[float] = Field(None, examples=[2350.00])
     num_negotiation_rounds: int = Field(..., ge=0, examples=[2])

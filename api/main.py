@@ -520,6 +520,9 @@ async def log_call(request: Request, db: Session = Depends(get_db)):
             or "Unknown Carrier"
         )
         raw["load_id"] = _clean(raw.get("load_id"))
+        raw["equipment_type"] = _clean(raw.get("equipment_type"))
+        raw["origin"] = _clean(raw.get("origin"))
+        raw["destination"] = _clean(raw.get("destination"))
         raw["notes"] = _clean(raw.get("notes"))
 
         for field in ["initial_rate_offered"]:
